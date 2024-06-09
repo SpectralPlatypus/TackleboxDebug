@@ -8,7 +8,7 @@ A small [BepInEx](https://github.com/BepInEx/BepInEx) mod for enabling the other
 - `<F1>` Quick warp
 - `<F2>` Toggle Noclip
 - `<Q/E>` Change altitude in noclip mode
-- `<1/2>` Decrease/increase speed in noclip mode
+- `<1/2/3>` Decrease/increase/reset speed in noclip mode
 - `<L3+R3>` Toggle ImGUI menu
 
 ## Usage
