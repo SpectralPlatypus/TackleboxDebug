@@ -23,19 +23,19 @@
   
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
-      <HintPath>..\..\..\..\SteamLibrary\steamapps\common\The Big Catch Tacklebox\The Big Catch Tacklebox_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <HintPath>libs\Assembly-CSharp.dll</HintPath>
     </Reference>
     <Reference Include="Assembly-CSharp-firstpass">
-      <HintPath>..\..\..\..\SteamLibrary\steamapps\common\The Big Catch Tacklebox\The Big Catch Tacklebox_Data\Managed\Assembly-CSharp-firstpass.dll</HintPath>
+      <HintPath>libs\Assembly-CSharp-firstpass.dll</HintPath>
     </Reference>
     <Reference Include="RG.ImGui">
-      <HintPath>..\..\..\..\SteamLibrary\steamapps\common\The Big Catch Tacklebox\The Big Catch Tacklebox_Data\Managed\RG.ImGui.dll</HintPath>
+      <HintPath>libs\RG.ImGui.dll</HintPath>
     </Reference>
     <Reference Include="RG.ImGui.Unity">
-      <HintPath>..\..\..\..\SteamLibrary\steamapps\common\The Big Catch Tacklebox\The Big Catch Tacklebox_Data\Managed\RG.ImGui.Unity.dll</HintPath>
+      <HintPath>libs\RG.ImGui.Unity.dll</HintPath>
     </Reference>
     <Reference Include="Sirenix.Serialization">
-      <HintPath>..\..\..\..\SteamLibrary\steamapps\common\The Big Catch Tacklebox\The Big Catch Tacklebox_Data\Managed\Sirenix.Serialization.dll</HintPath>
+      <HintPath>libs\Sirenix.Serialization.dll</HintPath>
     </Reference>
   </ItemGroup>
   
