@@ -1,9 +1,5 @@
 ﻿using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using UnityEngine;
-using UnityEngine.Audio;
 
 namespace TackleboxDbg
 {
@@ -18,6 +14,7 @@ namespace TackleboxDbg
             {
                 __instance.ToggleDebugEnabled();
             }
+
         }
     }
 }
