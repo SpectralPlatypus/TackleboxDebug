@@ -21,6 +21,10 @@
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.2" PrivateAssets="all" />
   </ItemGroup>
   
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+	<DebugType>Full</DebugType>
+	</PropertyGroup>
+
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
       <HintPath>libs\Assembly-CSharp.dll</HintPath>
@@ -38,8 +42,4 @@
       <HintPath>libs\Sirenix.Serialization.dll</HintPath>
     </Reference>
   </ItemGroup>
-  
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="copy /Y &quot;$(TargetPath)&quot; &quot;..\..\..\..\SteamLibrary\steamapps\common\The Big Catch Tacklebox\BepInEx\plugins\$(TargetFileName)&quot;" />
-  </Target>
 </Project>
