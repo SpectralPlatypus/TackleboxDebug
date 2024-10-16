@@ -10,7 +10,7 @@ namespace TackleboxDbg
     {
         public const string PLUGIN_GUID = "TackleboxDbg";
         public const string PLUGIN_NAME = "TackleboxDbg";
-        public const string PLUGIN_VERSION = "1.2.0";
+        public const string PLUGIN_VERSION = "1.2.1";
     }
 
     [BepInPlugin(ModInfo.PLUGIN_GUID, ModInfo.PLUGIN_NAME, ModInfo.PLUGIN_VERSION)]
@@ -52,13 +52,17 @@ namespace TackleboxDbg
             {
                 Manager._instance.ToggleDebugEnabled();
             }
-            if (RespawnCollectiblesKey.Value.IsDown())
+
+            if (Manager._instance._debugEnabled)
             {
-                ResetCollectibles();
-            }
-            if(ClearShreddersKey.Value.IsDown())
-            {
-                BurrowShredders();
+                if (RespawnCollectiblesKey.Value.IsDown())
+                {
+                    ResetCollectibles();
+                }
+                if (ClearShreddersKey.Value.IsDown())
+                {
+                    BurrowShredders();
+                }
             }
         }
 
