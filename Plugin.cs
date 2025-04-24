@@ -1,8 +1,11 @@
 ﻿using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
+using System.Collections;
+using System.Data.SqlTypes;
 using System.Reflection;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace TackleboxDbg
 {
@@ -22,6 +25,7 @@ namespace TackleboxDbg
         ConfigEntry<KeyboardShortcut> ToggleDebugKey;
         ConfigEntry<KeyboardShortcut> RespawnCollectiblesKey;
         ConfigEntry<KeyboardShortcut> ClearShreddersKey;
+        ConfigEntry<KeyboardShortcut> ReloadSceneKey;
         public static ConfigEntry<bool> OverrideDebugArrow;
         #endregion
 
@@ -43,6 +47,7 @@ namespace TackleboxDbg
             ToggleDebugKey = Config.Bind("Inputs", "ToggleDebug", new KeyboardShortcut(KeyCode.F11), "The key for toggling Debug HUD");
             RespawnCollectiblesKey = Config.Bind("Inputs", "RespawnCollectibles", new KeyboardShortcut(KeyCode.F10), "Respawn Coins/Fish");
             ClearShreddersKey = Config.Bind("Inputs", "ClearShredders", new KeyboardShortcut(KeyCode.F9), "Despawn untethered shredders");
+            ReloadSceneKey = Config.Bind("Inputs", "ReloadSceneKey", new KeyboardShortcut(KeyCode.F8), "Reload the current non-Title scene");
             OverrideDebugArrow = Config.Bind("Misc", "OverrideDbgArrow", true, "Changes Debug Arrow behavior to display the respawn area");
         }
 
@@ -62,6 +67,10 @@ namespace TackleboxDbg
                 if (ClearShreddersKey.Value.IsDown())
                 {
                     BurrowShredders();
+                }
+                if(ReloadSceneKey.Value.IsDown())
+                {
+                    Manager._instance.StartCoroutine(ReloadSceneRoutine());
                 }
             }
         }
@@ -108,6 +117,22 @@ namespace TackleboxDbg
             foreach(var shredder in activeShredderList)
             {
                 shredder.Burrow();
+            }
+        }
+
+        static IEnumerator ReloadSceneRoutine()
+        {
+            string activeSceneName = SceneManager.GetActiveScene().name;
+
+            if(activeSceneName != "Title")
+            {
+                Vector3 spawnTransPos = Manager.GetPlayerMachine()._spawnTransform.position;
+
+                Manager.GetSceneLoader().LoadSceneByPath(activeSceneName);
+                yield return new WaitUntil(() => Manager.GetSceneLoader()._loadingSceneState._isLoaded);
+
+                Manager.GetPlayerMachine()._spawnTransform.position = spawnTransPos;
+                Manager.GetPlayerMachine().RespawnPlayer();
             }
         }
     }
