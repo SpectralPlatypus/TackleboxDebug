@@ -1,11 +1,8 @@
 ﻿using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
-using System.Collections;
-using System.Data.SqlTypes;
 using System.Reflection;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 namespace TackleboxDbg
 {
@@ -25,7 +22,8 @@ namespace TackleboxDbg
         ConfigEntry<KeyboardShortcut> ToggleDebugKey;
         ConfigEntry<KeyboardShortcut> RespawnCollectiblesKey;
         ConfigEntry<KeyboardShortcut> ClearShreddersKey;
-        ConfigEntry<KeyboardShortcut> ReloadSceneKey;
+        ConfigEntry<KeyboardShortcut> SaveStateKey;
+        ConfigEntry<KeyboardShortcut> LoadStateKey;
         public static ConfigEntry<bool> OverrideDebugArrow;
         #endregion
 
@@ -47,7 +45,8 @@ namespace TackleboxDbg
             ToggleDebugKey = Config.Bind("Inputs", "ToggleDebug", new KeyboardShortcut(KeyCode.F11), "The key for toggling Debug HUD");
             RespawnCollectiblesKey = Config.Bind("Inputs", "RespawnCollectibles", new KeyboardShortcut(KeyCode.F10), "Respawn Coins/Fish");
             ClearShreddersKey = Config.Bind("Inputs", "ClearShredders", new KeyboardShortcut(KeyCode.F9), "Despawn untethered shredders");
-            ReloadSceneKey = Config.Bind("Inputs", "ReloadSceneKey", new KeyboardShortcut(KeyCode.F8), "Reload the current non-Title scene");
+            LoadStateKey = Config.Bind("Inputs", "LoadStateKey", new KeyboardShortcut(KeyCode.F8), "Load the saved game data");
+            SaveStateKey = Config.Bind("Inputs", "SaveStateKey", new KeyboardShortcut(KeyCode.F7), "Save the current game data");
             OverrideDebugArrow = Config.Bind("Misc", "OverrideDbgArrow", true, "Changes Debug Arrow behavior to display the respawn area");
         }
 
@@ -68,9 +67,13 @@ namespace TackleboxDbg
                 {
                     BurrowShredders();
                 }
-                if(ReloadSceneKey.Value.IsDown())
+                if(SaveStateKey.Value.IsDown())
                 {
-                    Manager._instance.StartCoroutine(ReloadSceneRoutine());
+                    SaveState.SaveCurrentData();
+                }
+                if(LoadStateKey.Value.IsDown())
+                {
+                    SaveState.LoadSavedData();
                 }
             }
         }
@@ -103,6 +106,15 @@ namespace TackleboxDbg
                 coin._artObject.SetActive(true);
                 coin._gameObject.SetActive(true);
             }
+            var zipList = FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            foreach(var zip in zipList)
+            {
+                if(!zip._startsActivated)
+                {
+                    // A little bit buggy; is there a better way to do this?
+                    zip.Deactivate();
+                }
+            }
 
             coinMgr._coinPoolSmall.DisableAll();
             coinMgr._coinPoolMedium.DisableAll();
@@ -117,22 +129,6 @@ namespace TackleboxDbg
             foreach(var shredder in activeShredderList)
             {
                 shredder.Burrow();
-            }
-        }
-
-        static IEnumerator ReloadSceneRoutine()
-        {
-            string activeSceneName = SceneManager.GetActiveScene().name;
-
-            if(activeSceneName != "Title")
-            {
-                Vector3 spawnTransPos = Manager.GetPlayerMachine()._spawnTransform.position;
-
-                Manager.GetSceneLoader().LoadSceneByPath(activeSceneName);
-                yield return new WaitUntil(() => Manager.GetSceneLoader()._loadingSceneState._isLoaded);
-
-                Manager.GetPlayerMachine()._spawnTransform.position = spawnTransPos;
-                Manager.GetPlayerMachine().RespawnPlayer();
             }
         }
     }
