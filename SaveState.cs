@@ -12,6 +12,7 @@ namespace TackleboxDbg {
         static Vector3 savedSpawnTransPos;
         static Vector3 savedPlayerPos;
         static Vector3 savedLookDir;
+        static int savedHealth;
         static readonly Dictionary<Guid, bool> zipRingValues = [];
         
         public static void SaveCurrentData()
@@ -30,6 +31,7 @@ namespace TackleboxDbg {
             savedSpawnTransPos = Manager.GetPlayerMachine()._spawnTransform.position;
             savedPlayerPos = Manager.GetPlayerMachine()._position;
             savedLookDir = Manager.GetPlayerCamera()._lookDirection;
+            savedHealth = Manager.GetPlayerMachine()._currentHealth;
             
             string contents = JsonUtility.ToJson(Manager.GetSaveManager()._currentSaveData);
             File.WriteAllText(savestatePath, contents);
@@ -81,6 +83,12 @@ namespace TackleboxDbg {
             {
                 Manager.GetPlayerCamera().SetLookDirection(savedLookDir);
             }
+
+            if(savedHealth != 0)
+            {
+                Manager.GetPlayerMachine().SetCurrentHealth(savedHealth);
+            }
+            else Manager.GetPlayerMachine().SetCurrentHealth(3);
         }
     }
 }
