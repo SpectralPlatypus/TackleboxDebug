@@ -111,8 +111,7 @@ namespace TackleboxDbg
             {
                 if(!zip._startsActivated)
                 {
-                    // A little bit buggy; is there a better way to do this?
-                    zip.Deactivate();
+                    zip.Deactivate(!zip._gameObject.activeInHierarchy);
                 }
             }
 
