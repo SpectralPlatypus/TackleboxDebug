@@ -24,6 +24,7 @@ namespace TackleboxDbg
         ConfigEntry<KeyboardShortcut> ClearShreddersKey;
         ConfigEntry<KeyboardShortcut> SaveStateKey;
         ConfigEntry<KeyboardShortcut> LoadStateKey;
+        ConfigEntry<KeyboardShortcut> GiveWhistleKey;
         public static ConfigEntry<bool> OverrideDebugArrow;
         #endregion
 
@@ -45,8 +46,9 @@ namespace TackleboxDbg
             ToggleDebugKey = Config.Bind("Inputs", "ToggleDebug", new KeyboardShortcut(KeyCode.F11), "The key for toggling Debug HUD");
             RespawnCollectiblesKey = Config.Bind("Inputs", "RespawnCollectibles", new KeyboardShortcut(KeyCode.F10), "Respawn Coins/Fish");
             ClearShreddersKey = Config.Bind("Inputs", "ClearShredders", new KeyboardShortcut(KeyCode.F9), "Despawn untethered shredders");
-            LoadStateKey = Config.Bind("Inputs", "LoadStateKey", new KeyboardShortcut(KeyCode.F8), "Load the saved game data");
-            SaveStateKey = Config.Bind("Inputs", "SaveStateKey", new KeyboardShortcut(KeyCode.F7), "Save the current game data");
+            GiveWhistleKey = Config.Bind("Inputs", "GiveWhistleKey", new KeyboardShortcut(KeyCode.F8), "Give the player the whistle");
+            LoadStateKey = Config.Bind("Inputs", "LoadStateKey", new KeyboardShortcut(KeyCode.F4), "Load the saved game data");
+            SaveStateKey = Config.Bind("Inputs", "SaveStateKey", new KeyboardShortcut(KeyCode.F3), "Save the current game data");
             OverrideDebugArrow = Config.Bind("Misc", "OverrideDbgArrow", true, "Changes Debug Arrow behavior to display the respawn area");
         }
 
@@ -66,6 +68,10 @@ namespace TackleboxDbg
                 if (ClearShreddersKey.Value.IsDown())
                 {
                     BurrowShredders();
+                }
+                if(GiveWhistleKey.Value.IsDown())
+                {
+                    GiveWhistle();
                 }
                 if(SaveStateKey.Value.IsDown())
                 {
@@ -130,6 +136,11 @@ namespace TackleboxDbg
             {
                 shredder.Burrow();
             }
+        }
+
+        static void GiveWhistle()
+        {
+            Manager.GetPlayerMachine()._hasWhistle.SetValue(true);
         }
     }
 }

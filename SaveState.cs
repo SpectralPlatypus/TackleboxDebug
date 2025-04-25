@@ -46,6 +46,8 @@ namespace TackleboxDbg {
             SaveData data = new();
             string contents = File.ReadAllText(savestatePath);
             JsonUtility.FromJsonOverwrite(contents, data);
+            // May want to use a slot that is either in use or not in use, depending on how we want to implement it. 
+            // Just going to make a temporary save for now.
             data.name = "tempSave";
             Manager.GetSaveManager().PrepareGameState(data);
 
@@ -75,7 +77,10 @@ namespace TackleboxDbg {
                 Manager.GetPlayerMachine().Teleport(savedPlayerPos);
             }
 
-            Manager.GetPlayerCamera().SetLookDirection(savedLookDir);
+            if(savedLookDir != Vector3.zero) // Probably find a better way of doing this?
+            {
+                Manager.GetPlayerCamera().SetLookDirection(savedLookDir);
+            }
         }
     }
 }
