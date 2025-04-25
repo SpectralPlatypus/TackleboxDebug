@@ -6,80 +6,76 @@ namespace TackleboxDbg {
     static class SaveState
     {
         static readonly string savestatePath = Application.persistentDataPath + "/savestate.json";
-        static Vector3 spawnTransPos;
-        static Vector3 playerPos;
-        static Dictionary<Guid, bool> zipRingValues = [];
+
+        // Temporary values; these are not saved on game restart.
+        // Should probably either delete the savestate.json on game close or find a way to save these values in savestate.json or otherwise.
+        static Vector3 savedSpawnTransPos;
+        static Vector3 savedPlayerPos;
+        static Vector3 savedLookDir;
+        static readonly Dictionary<Guid, bool> zipRingValues = [];
         
         public static void SaveCurrentData()
         {
+            // The game either doesn't save or load the checkpoint rods properly, so I'm doing it manually here.
             zipRingValues.Clear();
             var zipList = GameObject.FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             foreach(var zip in zipList)
             {
                 var ar = zip._activatedReference;
-                if(ar is not null) 
-                {
-                    zipRingValues.Add(ar._guid, ar.GetValue());
-                }
+                if(ar is null) continue;
+                
+                zipRingValues.Add(ar._guid, ar.GetValue());
             }
 
-            spawnTransPos = Manager.GetPlayerMachine()._spawnTransform.position;
-            playerPos = Manager.GetPlayerMachine()._position;
-            SaveSavestateFile();
-        }
-        public static void LoadSavedData()
-        {
-            Manager._instance.StartCoroutine(ReloadSceneRoutine());
-        }
-
-        static void SaveSavestateFile()
-        {
+            savedSpawnTransPos = Manager.GetPlayerMachine()._spawnTransform.position;
+            savedPlayerPos = Manager.GetPlayerMachine()._position;
+            savedLookDir = Manager.GetPlayerCamera()._lookDirection;
+            
             string contents = JsonUtility.ToJson(Manager.GetSaveManager()._currentSaveData);
             File.WriteAllText(savestatePath, contents);
         }
-
-        static void LoadSavestateFile(SaveData data)
+        public static void LoadSavedData()
         {
-            string contents = File.ReadAllText(savestatePath);
-            JsonUtility.FromJsonOverwrite(contents, data);
-            data.name = "savestate";
-            Manager.GetSaveManager().PrepareGameState(data);
+            Manager._instance.StartCoroutine(LoadSavestateRoutine());
         }
 
-        static IEnumerator ReloadSceneRoutine()
+        private static IEnumerator LoadSavestateRoutine()
         {
-            if(Manager.GetMainMenu()._currentState == Manager.GetMainMenu()._inGameState)
+            if(Manager.GetMainMenu()._currentState != Manager.GetMainMenu()._inGameState) yield break;
+            
+            SaveData data = new();
+            string contents = File.ReadAllText(savestatePath);
+            JsonUtility.FromJsonOverwrite(contents, data);
+            data.name = "tempSave";
+            Manager.GetSaveManager().PrepareGameState(data);
+
+            Manager.GetMainMenu().LoadGameScene();
+            yield return new WaitUntil(() => Manager.GetMainMenu()._currentState == Manager.GetMainMenu()._inGameState);
+
+            // Load the saved zip ring values.
+            var zipList = GameObject.FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            foreach(var zip in zipList)
             {
-                SaveData data = new();
-                LoadSavestateFile(data);
+                var ar = zip._activatedReference;
 
-                Manager.GetMainMenu().LoadGameScene();
-                yield return new WaitUntil(() => Manager.GetMainMenu()._currentState == Manager.GetMainMenu()._inGameState);
-                
-                var zipList = GameObject.FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-                foreach(var zip in zipList)
-                {
-                    var ar = zip._activatedReference;
+                if(ar is null) continue;
+                if(!zipRingValues.ContainsKey(ar._guid)) continue;
 
-                    if(ar is null) continue;
-                    if(!zipRingValues.ContainsKey(ar._guid)) continue;
-
-                    if(zipRingValues[ar._guid]) zip.Activate(true);
-                    else zip.Deactivate(true);
-                }
-
-                if(spawnTransPos != Vector3.zero) // probably find a better way of doing this?
-                {
-                    Manager.GetPlayerMachine()._spawnTransform.position = spawnTransPos;
-                }
-                if(playerPos != Vector3.zero) // probably find a better way of doing this?
-                {
-                    Manager.GetPlayerMachine().Teleport(playerPos);
-                }
-
-                // Change back to our last selected save slot so the game doesn't continue writing over the savestate.json
-                Manager.GetSaveManager().PrepareGameState(Manager.GetMainMenu()._lastSelectedSaveData.GetValue());
+                if(zipRingValues[ar._guid]) zip.Activate(true);
+                else zip.Deactivate(true);
             }
+
+            if(savedSpawnTransPos != Vector3.zero) // Probably find a better way of doing this?
+            {
+                Manager.GetPlayerMachine()._spawnTransform.position = savedSpawnTransPos;
+            }
+
+            if(savedPlayerPos != Vector3.zero) // Probably find a better way of doing this?
+            {
+                Manager.GetPlayerMachine().Teleport(savedPlayerPos);
+            }
+
+            Manager.GetPlayerCamera().SetLookDirection(savedLookDir);
         }
     }
 }
