@@ -12,6 +12,7 @@ namespace TackleboxDbg {
         static Vector3 savedSpawnTransPos;
         static Vector3 savedPlayerPos;
         static Vector3 savedLookDir;
+        static Vector3 savedFacingDir;
         static int savedHealth;
         static readonly Dictionary<Guid, bool> zipRingValues = [];
         
@@ -31,6 +32,7 @@ namespace TackleboxDbg {
             savedSpawnTransPos = Manager.GetPlayerMachine()._spawnTransform.position;
             savedPlayerPos = Manager.GetPlayerMachine()._position;
             savedLookDir = Manager.GetPlayerCamera()._lookDirection;
+            savedFacingDir = Manager.GetPlayerMachine()._currentFacingDirection;
             savedHealth = Manager.GetPlayerMachine()._currentHealth;
             
             string contents = JsonUtility.ToJson(Manager.GetSaveManager()._currentSaveData);
@@ -69,14 +71,16 @@ namespace TackleboxDbg {
                 else zip.Deactivate(true);
             }
 
+            PlayerMachine player = Manager.GetPlayerMachine();
+
             if(savedSpawnTransPos != Vector3.zero) // Probably find a better way of doing this?
             {
-                Manager.GetPlayerMachine()._spawnTransform.position = savedSpawnTransPos;
+                player._spawnTransform.position = savedSpawnTransPos;
             }
 
             if(savedPlayerPos != Vector3.zero) // Probably find a better way of doing this?
             {
-                Manager.GetPlayerMachine().Teleport(savedPlayerPos);
+                player.Teleport(savedPlayerPos);
             }
 
             if(savedLookDir != Vector3.zero) // Probably find a better way of doing this?
@@ -84,11 +88,18 @@ namespace TackleboxDbg {
                 Manager.GetPlayerCamera().SetLookDirection(savedLookDir);
             }
 
-            if(savedHealth != 0)
+            if(savedFacingDir != Vector3.zero)
             {
-                Manager.GetPlayerMachine().SetCurrentHealth(savedHealth);
+                player._targetFacingDirection = savedFacingDir;
+                player._currentFacingDirection = savedFacingDir;
             }
-            else Manager.GetPlayerMachine().SetCurrentHealth(3);
+
+            yield return new WaitUntil(() => player._currentHealth == 3);
+
+            if(0 < savedHealth && savedHealth < 3)
+            {
+                player.SetCurrentHealth(savedHealth);
+            }
         }
     }
 }
