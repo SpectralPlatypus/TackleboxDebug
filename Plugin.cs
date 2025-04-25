@@ -112,6 +112,11 @@ namespace TackleboxDbg
                 coin._artObject.SetActive(true);
                 coin._gameObject.SetActive(true);
             }
+
+            coinMgr._coinPoolSmall.DisableAll();
+            coinMgr._coinPoolMedium.DisableAll();
+            coinMgr._coinPoolLarge.DisableAll();
+            
             var zipList = FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             foreach(var zip in zipList)
             {
@@ -121,10 +126,6 @@ namespace TackleboxDbg
                     zip.Deactivate(IsInstant: !zip._gameObject.activeInHierarchy);
                 }
             }
-
-            coinMgr._coinPoolSmall.DisableAll();
-            coinMgr._coinPoolMedium.DisableAll();
-            coinMgr._coinPoolLarge.DisableAll();
         }
 
         static FieldInfo activeShredders = AccessTools.DeclaredField(typeof(ShredderManager), "_activeShredders");
