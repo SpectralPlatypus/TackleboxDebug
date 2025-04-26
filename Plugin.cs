@@ -22,6 +22,9 @@ namespace TackleboxDbg
         ConfigEntry<KeyboardShortcut> ToggleDebugKey;
         ConfigEntry<KeyboardShortcut> RespawnCollectiblesKey;
         ConfigEntry<KeyboardShortcut> ClearShreddersKey;
+        ConfigEntry<KeyboardShortcut> SaveStateKey;
+        ConfigEntry<KeyboardShortcut> LoadStateKey;
+        ConfigEntry<KeyboardShortcut> GiveWhistleKey;
         public static ConfigEntry<bool> OverrideDebugArrow;
         #endregion
 
@@ -43,6 +46,9 @@ namespace TackleboxDbg
             ToggleDebugKey = Config.Bind("Inputs", "ToggleDebug", new KeyboardShortcut(KeyCode.F11), "The key for toggling Debug HUD");
             RespawnCollectiblesKey = Config.Bind("Inputs", "RespawnCollectibles", new KeyboardShortcut(KeyCode.F10), "Respawn Coins/Fish");
             ClearShreddersKey = Config.Bind("Inputs", "ClearShredders", new KeyboardShortcut(KeyCode.F9), "Despawn untethered shredders");
+            GiveWhistleKey = Config.Bind("Inputs", "GiveWhistleKey", new KeyboardShortcut(KeyCode.F8), "Give the player the whistle");
+            LoadStateKey = Config.Bind("Inputs", "LoadStateKey", new KeyboardShortcut(KeyCode.F4), "Load the saved game data");
+            SaveStateKey = Config.Bind("Inputs", "SaveStateKey", new KeyboardShortcut(KeyCode.F3), "Save the current game data");
             OverrideDebugArrow = Config.Bind("Misc", "OverrideDbgArrow", true, "Changes Debug Arrow behavior to display the respawn area");
         }
 
@@ -62,6 +68,18 @@ namespace TackleboxDbg
                 if (ClearShreddersKey.Value.IsDown())
                 {
                     BurrowShredders();
+                }
+                if(GiveWhistleKey.Value.IsDown())
+                {
+                    GiveWhistle();
+                }
+                if(SaveStateKey.Value.IsDown())
+                {
+                    SaveState.SaveCurrentData();
+                }
+                if(LoadStateKey.Value.IsDown())
+                {
+                    SaveState.LoadSavedData();
                 }
             }
         }
@@ -98,6 +116,16 @@ namespace TackleboxDbg
             coinMgr._coinPoolSmall.DisableAll();
             coinMgr._coinPoolMedium.DisableAll();
             coinMgr._coinPoolLarge.DisableAll();
+            
+            var zipList = FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            foreach(var zip in zipList)
+            {
+                if(!zip._startsActivated)
+                {
+                    // The zips don't instant-deactivate properly if they're active.
+                    zip.Deactivate(IsInstant: !zip._gameObject.activeInHierarchy);
+                }
+            }
         }
 
         static FieldInfo activeShredders = AccessTools.DeclaredField(typeof(ShredderManager), "_activeShredders");
@@ -109,6 +137,11 @@ namespace TackleboxDbg
             {
                 shredder.Burrow();
             }
+        }
+
+        static void GiveWhistle()
+        {
+            Manager.GetPlayerMachine()._hasWhistle.SetValue(true);
         }
     }
 }
