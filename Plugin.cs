@@ -55,6 +55,8 @@ namespace TackleboxDbg
             LoadStateKey = Config.Bind("Inputs", "LoadStateKey", new KeyboardShortcut(KeyCode.F4), "Load the saved game data");
             SaveStateKey = Config.Bind("Inputs", "SaveStateKey", new KeyboardShortcut(KeyCode.F3), "Save the current game data");
             OverrideDebugArrow = Config.Bind("Misc", "OverrideDbgArrow", true, "Changes Debug Arrow behavior to display the respawn area");
+
+            SaveStateManager.Init();
         }
 
         private void Update()
@@ -81,11 +83,11 @@ namespace TackleboxDbg
                 }
                 if(SaveStateKey.Value.IsDown())
                 {
-                    SaveState.SaveCurrentData();
+                    SaveStateManager.SaveCurrentData();
                 }
                 if(LoadStateKey.Value.IsDown())
                 {
-                    SaveState.LoadSavedData();
+                    SaveStateManager.LoadSavedData();
                 }
             }
         }

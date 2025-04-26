@@ -3,61 +3,69 @@ using UnityEngine;
 
 namespace TackleboxDbg
 {
-    static class SaveState
+    static class SaveStateManager
     {
-        static readonly string savestatePath = Application.persistentDataPath + "/savestate.json";
+        private static readonly string saveStatesPath = Application.persistentDataPath + "/SaveStates";
+        private static SaveStateData data = new();
+        private static MainMenu MainMenu => Manager.GetMainMenu();
+        private static PlayerMachine Player => Manager.GetPlayerMachine();
+        private static SaveManager SaveManager => Manager.GetSaveManager();
+        private static PlayerCamera PlayerCamera => Manager.GetPlayerCamera();
+        private static bool IsInGame => MainMenu._currentState == MainMenu._inGameState;
 
-        // Temporary values; these are not saved on game restart.
-        // Should probably either delete the savestate.json on game close or find a way to save these values in savestate.json or otherwise.
-        static Vector3 savedSpawnTransPos;
-        static Vector3 savedPlayerPos;
-        static Vector3 savedLookDir;
-        static Vector3 savedFacingDir;
-        static int savedHealth;
-        static readonly Dictionary<Guid, bool> zipRingValues = [];
-        
+        public static void Init()
+        {
+            Directory.CreateDirectory(saveStatesPath);
+            data = new SaveStateData(saveStatesPath + "/savestate.json");
+        }
+
         public static void SaveCurrentData()
         {
+            if(!IsInGame) return;
+
+            data = GetCurrentData();
+            data.WriteToFile(saveStatesPath+ "/savestate.json");
+        }
+
+        public static void LoadSavedData()
+        {
+            if(!IsInGame) return;
+            Manager._instance.StartCoroutine(LoadSaveStateRoutine());
+        }
+
+        private static SaveStateData GetCurrentData()
+        {
+            SaveStateData data = new();
+
             // The game either doesn't save or load the checkpoint rods properly, so I'm doing it manually here.
-            zipRingValues.Clear();
             var zipList = GameObject.FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             foreach(var zip in zipList)
             {
                 var ar = zip._activatedReference;
                 if(ar is null) continue;
                 
-                zipRingValues.Add(ar._guid, ar.GetValue());
+                data.AddToZipRings(ar._guid, ar.GetValue());
             }
-
-            savedSpawnTransPos = Manager.GetPlayerMachine()._spawnTransform.position;
-            savedPlayerPos = Manager.GetPlayerMachine()._position;
-            savedLookDir = Manager.GetPlayerCamera()._lookDirection;
-            savedFacingDir = Manager.GetPlayerMachine()._currentFacingDirection;
-            savedHealth = Manager.GetPlayerMachine()._currentHealth;
+        
+            data.spawnTransformPos = Player._spawnTransform.position;
+            data.playerPos = Player._position;
+            data.lookDir = Manager.GetPlayerCamera()._lookDirection;
+            data.facingDir = Player._currentFacingDirection;
+            data.health = Player._currentHealth;
             
-            string contents = JsonUtility.ToJson(Manager.GetSaveManager()._currentSaveData);
-            File.WriteAllText(savestatePath, contents);
-        }
-        public static void LoadSavedData()
-        {
-            Manager._instance.StartCoroutine(LoadSavestateRoutine());
+            data.SaveData = SaveManager._currentSaveData;
+
+            return data;
         }
 
-        private static IEnumerator LoadSavestateRoutine()
+        private static IEnumerator LoadSaveStateRoutine()
         {
-            if(Manager.GetMainMenu()._currentState != Manager.GetMainMenu()._inGameState) yield break;
-            
-            SaveData data = new();
-            string contents = File.ReadAllText(savestatePath);
-            JsonUtility.FromJsonOverwrite(contents, data);
-            // May want to use a slot that is either in use or not in use, depending on how we want to implement it. 
-            // Just going to make a temporary save for now.
-            data.name = "tempSave";
-            Manager.GetSaveManager().PrepareGameState(data);
+            if(data.SaveDataString is null) yield break;
 
+            SaveManager.PrepareGameState(data.SaveData);
             Manager.GetMainMenu().LoadGameScene();
-            yield return new WaitUntil(() => Manager.GetMainMenu()._currentState == Manager.GetMainMenu()._inGameState);
-
+            yield return new WaitUntil(() => IsInGame);
+            
             // Load the saved zip ring values.
             var zipList = GameObject.FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             foreach(var zip in zipList)
@@ -65,41 +73,82 @@ namespace TackleboxDbg
                 var ar = zip._activatedReference;
 
                 if(ar is null) continue;
-                if(!zipRingValues.ContainsKey(ar._guid)) continue;
 
-                if(zipRingValues[ar._guid]) zip.Activate(true);
+                Dictionary<Guid, bool> dict = data.ZipRings;
+
+                if(!dict.ContainsKey(ar._guid)) continue;
+
+                if(dict[ar._guid]) zip.Activate(true);
                 else zip.Deactivate(true);
             }
 
-            PlayerMachine player = Manager.GetPlayerMachine();
+            Player._spawnTransform.position = data.spawnTransformPos;
+            Player.Teleport(data.playerPos);
+            PlayerCamera.SetLookDirection(data.lookDir);
+            Player._targetFacingDirection = data.facingDir;
+            Player._currentFacingDirection = data.facingDir;
 
-            if(savedSpawnTransPos != Vector3.zero) // Probably find a better way of doing this?
+            yield return new WaitUntil(() => Player._currentHealth == 3);
+            if(0 < data.health && data.health < 3) Player.SetCurrentHealth(data.health);
+        }
+    }
+    
+    [Serializable]
+    public class SaveStateData
+    {
+        public Vector3 spawnTransformPos;
+        public Vector3 playerPos;
+        public Vector3 lookDir;
+        public Vector3 facingDir;
+        public int health;
+        public Dictionary<Guid, bool> ZipRings => ZipRingGuids
+            .Zip(ZipRingBools, (k, v) => new {k, v})
+            .ToDictionary(x => new Guid(x.k), x => x.v);
+        
+        // Dictionaries aren't serializable for some reason so we're using two lists, which are.
+        public List<string> ZipRingGuids = [];
+        public List<bool> ZipRingBools = [];
+
+        public string SaveDataString;
+        public SaveData SaveData
+        {
+            get
             {
-                player._spawnTransform.position = savedSpawnTransPos;
+                SaveData data = new();
+                JsonUtility.FromJsonOverwrite(SaveDataString, data);
+                // May want to use a slot that is either in use or not in use, depending on how we want to implement it.
+                // Just going to make a temporary save for now.
+                data.name = "tempSave";
+                return data;
             }
-
-            if(savedPlayerPos != Vector3.zero) // Probably find a better way of doing this?
+            set
             {
-                player.Teleport(savedPlayerPos);
+                SaveDataString = JsonUtility.ToJson(value);
             }
+        }
+        
+        public SaveStateData() { }
 
-            if(savedLookDir != Vector3.zero) // Probably find a better way of doing this?
-            {
-                Manager.GetPlayerCamera().SetLookDirection(savedLookDir);
-            }
+        /// <summary>
+        /// Creates a new SaveStateData from an already existing file.
+        /// </summary>
+        /// <param name="path">The path of the .json file to read from.</param>
+        public SaveStateData(string path)
+        {
+            if(!File.Exists(path)) return;
 
-            if(savedFacingDir != Vector3.zero)
-            {
-                player._targetFacingDirection = savedFacingDir;
-                player._currentFacingDirection = savedFacingDir;
-            }
+            JsonUtility.FromJsonOverwrite(File.ReadAllText(path), this);
+        }
 
-            yield return new WaitUntil(() => player._currentHealth == 3);
-
-            if(0 < savedHealth && savedHealth < 3)
-            {
-                player.SetCurrentHealth(savedHealth);
-            }
+        public void WriteToFile(string path)
+        {
+            File.WriteAllText(path, JsonUtility.ToJson(this, true));
+        }
+        
+        public void AddToZipRings(Guid guid, bool activated)
+        {
+            ZipRingGuids.Add(guid.ToString());
+            ZipRingBools.Add(activated);
         }
     }
 }
