@@ -128,11 +128,9 @@ namespace TackleboxDbg
             var zipList = FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             foreach(var zip in zipList)
             {
-                if(!zip._startsActivated)
-                {
+                if(zip._activatedReference is not null)
                     // The zips don't instant-deactivate properly if they're active.
                     zip.Deactivate(IsInstant: !zip._gameObject.activeInHierarchy);
-                }
             }
         }
 
