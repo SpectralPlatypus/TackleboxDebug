@@ -1,30 +1,28 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.TextCore.Text;
+using UnityEngine.UIElements;
 
 namespace TackleboxDbg
 {
     static class SaveStateManager
     {
         private static readonly string saveStatesPath = Application.persistentDataPath + "/SaveStates";
-        private static SaveStateData data = new();
         private static MainMenu MainMenu => Manager.GetMainMenu();
         private static PlayerMachine Player => Manager.GetPlayerMachine();
         private static SaveManager SaveManager => Manager.GetSaveManager();
         private static PlayerCamera PlayerCamera => Manager.GetPlayerCamera();
         private static bool IsInGame => MainMenu._currentState == MainMenu._inGameState;
-
         public static void Init()
         {
             Directory.CreateDirectory(saveStatesPath);
-            data = new SaveStateData(saveStatesPath + "/savestate.json");
         }
 
         public static void SaveCurrentData()
         {
             if(!IsInGame) return;
 
-            data = GetCurrentData();
-            data.WriteToFile(saveStatesPath+ "/savestate.json");
+            GetCurrentData().WriteToFile(saveStatesPath + "/savestate.json");
         }
 
         public static void LoadSavedData()
@@ -44,12 +42,11 @@ namespace TackleboxDbg
                 var ar = zip._activatedReference;
                 if(ar is null) continue;
                 
-                data.AddToZipRings(ar._guid, ar.GetValue());
+                data.ZipRings.Add(ar._guid, ar.GetValue());
             }
         
-            data.spawnTransformPos = Player._spawnTransform.position;
             data.playerPos = Player._position;
-            data.lookDir = Manager.GetPlayerCamera()._lookDirection;
+            data.lookDir = PlayerCamera._lookDirection;
             data.facingDir = Player._currentFacingDirection;
             data.health = Player._currentHealth;
             
@@ -60,29 +57,27 @@ namespace TackleboxDbg
 
         private static IEnumerator LoadSaveStateRoutine()
         {
-            if(data.SaveDataString is null) yield break;
+            string currentSavePath = saveStatesPath + "/savestate.json";
+            if(!File.Exists(currentSavePath)) yield break;
+
+            SaveStateData data = new(currentSavePath);
 
             SaveManager.PrepareGameState(data.SaveData);
-            Manager.GetMainMenu().LoadGameScene();
+            MainMenu.LoadGameScene();
             yield return new WaitUntil(() => IsInGame);
-            
+
             // Load the saved zip ring values.
             var zipList = GameObject.FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             foreach(var zip in zipList)
             {
                 var ar = zip._activatedReference;
 
-                if(ar is null) continue;
+                if(ar is null || !data.ZipRings.ContainsKey(ar._guid)) continue;
 
-                Dictionary<Guid, bool> dict = data.ZipRings;
-
-                if(!dict.ContainsKey(ar._guid)) continue;
-
-                if(dict[ar._guid]) zip.Activate(true);
+                if(data.ZipRings[ar._guid]) zip.Activate(true);
                 else zip.Deactivate(true);
             }
 
-            Player._spawnTransform.position = data.spawnTransformPos;
             Player.Teleport(data.playerPos);
             PlayerCamera.SetLookDirection(data.lookDir);
             Player._targetFacingDirection = data.facingDir;
@@ -96,20 +91,20 @@ namespace TackleboxDbg
     [Serializable]
     public class SaveStateData
     {
-        public Vector3 spawnTransformPos;
         public Vector3 playerPos;
         public Vector3 lookDir;
         public Vector3 facingDir;
         public int health;
-        public Dictionary<Guid, bool> ZipRings => ZipRingGuids
-            .Zip(ZipRingBools, (k, v) => new {k, v})
-            .ToDictionary(x => new Guid(x.k), x => x.v);
-        
-        // Dictionaries aren't serializable for some reason so we're using two lists, which are.
-        public List<string> ZipRingGuids = [];
-        public List<bool> ZipRingBools = [];
 
-        public string SaveDataString;
+        // Dictionaries don't get serialized properly so we're using lists instead.
+        [SerializeField]
+        private List<string> ZipRingKeys = [];
+        [SerializeField]
+        private List<bool> ZipRingValues = [];
+        public Dictionary<Guid, bool> ZipRings = [];
+
+        [SerializeField]
+        private string SaveDataString;
         public SaveData SaveData
         {
             get
@@ -138,17 +133,17 @@ namespace TackleboxDbg
             if(!File.Exists(path)) return;
 
             JsonUtility.FromJsonOverwrite(File.ReadAllText(path), this);
+
+            ZipRings = ZipRingKeys
+                .Zip(ZipRingValues, (k, v) => new {k, v})
+                .ToDictionary(x => new Guid(x.k), x => x.v);
         }
 
         public void WriteToFile(string path)
         {
+            ZipRingKeys = [.. ZipRings.Keys.Select(k => k.ToString())];
+            ZipRingValues = [.. ZipRings.Values];
             File.WriteAllText(path, JsonUtility.ToJson(this, true));
-        }
-        
-        public void AddToZipRings(Guid guid, bool activated)
-        {
-            ZipRingGuids.Add(guid.ToString());
-            ZipRingBools.Add(activated);
         }
     }
 }
