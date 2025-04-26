@@ -1,8 +1,8 @@
-using System;
 using System.Collections;
 using UnityEngine;
 
-namespace TackleboxDbg {
+namespace TackleboxDbg
+{
     static class SaveState
     {
         static readonly string savestatePath = Application.persistentDataPath + "/savestate.json";

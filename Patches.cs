@@ -19,8 +19,8 @@ namespace TackleboxDbg
                 return instructions;
             }
 
-            var stateField = codes.Find(c=>c.opcode == OpCodes.Ldfld)?.operand as FieldInfo;
-            if(stateField == null)
+            var stateField = codes.Find(c => c.opcode == OpCodes.Ldfld)?.operand as FieldInfo;
+            if (stateField == null)
             {
                 return instructions;
             }
@@ -67,6 +67,7 @@ namespace TackleboxDbg
             return codes.AsEnumerable();
         }
 
+
         static MethodInfo dynMethod = typeof(PlayerMachine).GetMethod("BestValidGroundFromHistory", BindingFlags.NonPublic | BindingFlags.Instance);
         [HarmonyPatch(typeof(CheckpointUI), nameof(Checkpoint.ManagedFixedUpdate))]
         [HarmonyPostfix]
@@ -104,7 +105,7 @@ namespace TackleboxDbg
             RaycastHit info;
             if ((bool)mainCamera)
             {
-                Vector3 vector = (Vector3)dynMethod.Invoke(playerMachine, new object[] { 0.5f });
+                Vector3 vector = (Vector3)dynMethod.Invoke(playerMachine, [0.5f]);
                 Vector3 a = vector + -playerMachine._gravityDirection * 4f;
                 difference = a - mainCamera._transform.position;
                 hit = Physics.Raycast(mainCamera._transform.position, difference.normalized, out info, float.PositiveInfinity, Manager.GetPhysicsConfig().Ground, QueryTriggerInteraction.Ignore);

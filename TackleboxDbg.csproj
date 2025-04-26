@@ -13,7 +13,7 @@
   <ItemGroup>
     <PackageReference Include="BepInEx.Analyzers" Version="1.*" PrivateAssets="all" />
     <PackageReference Include="BepInEx.Core" Version="5.*" />
-    <PackageReference Include="BepInEx.PluginInfoProps" Version="1.*" />
+    <PackageReference Include="BepInEx.PluginInfoProps" Version="2.1.0" />
     <PackageReference Include="UnityEngine.Modules" Version="2023.2.20" IncludeAssets="compile" />
   </ItemGroup>
   
@@ -34,9 +34,6 @@
     </Reference>
     <Reference Include="RG.ImGui">
       <HintPath>libs\RG.ImGui.dll</HintPath>
-    </Reference>
-    <Reference Include="RG.ImGui.Unity">
-      <HintPath>libs\RG.ImGui.Unity.dll</HintPath>
     </Reference>
     <Reference Include="Sirenix.Serialization">
       <HintPath>libs\Sirenix.Serialization.dll</HintPath>

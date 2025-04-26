@@ -10,14 +10,13 @@ namespace TackleboxDbg
     {
         public const string PLUGIN_GUID = "TackleboxDbg";
         public const string PLUGIN_NAME = "TackleboxDbg";
-        public const string PLUGIN_VERSION = "1.2.1";
+        public const string PLUGIN_VERSION = "1.3.0";
     }
 
     [BepInPlugin(ModInfo.PLUGIN_GUID, ModInfo.PLUGIN_NAME, ModInfo.PLUGIN_VERSION)]
     [BepInProcess("The Big Catch Tacklebox.exe")]
     public class Plugin : BaseUnityPlugin
     {
-
         #region KEYBINDS
         ConfigEntry<KeyboardShortcut> ToggleDebugKey;
         ConfigEntry<KeyboardShortcut> RespawnCollectiblesKey;
@@ -28,10 +27,16 @@ namespace TackleboxDbg
         public static ConfigEntry<bool> OverrideDebugArrow;
         #endregion
 
+        #region REFLECTION
+        static FieldInfo spewedCoin = AccessTools.DeclaredField(typeof(Collectible), "_spewedCoin");
+        static FieldInfo activeShredders = AccessTools.DeclaredField(typeof(ShredderManager), "_activeShredders");
+        #endregion
+
         private void Awake()
         {
             // Plugin startup logic
             Logger.LogInfo($"Plugin {ModInfo.PLUGIN_NAME} is loaded!");
+            Logger.LogInfo($"Detected Game version: {BuildDate.Version()}");
 
             var harmony = new Harmony(ModInfo.PLUGIN_GUID);
             try
@@ -64,6 +69,7 @@ namespace TackleboxDbg
                 if (RespawnCollectiblesKey.Value.IsDown())
                 {
                     ResetCollectibles();
+                    ResetMookCoins();
                 }
                 if (ClearShreddersKey.Value.IsDown())
                 {
@@ -84,10 +90,10 @@ namespace TackleboxDbg
             }
         }
 
-        static void ResetCollectibles()
+        void ResetCollectibles()
         {
-            var captList = FindObjectsByType<IntroWalkingFish>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             var currentCapt = Manager.GetPlayerMachine()._currentCapturingCapturable;
+            var captList = FindObjectsByType<IntroWalkingFish>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             foreach (var fish in captList)
             {
                 if (fish._capturable == currentCapt)
@@ -106,7 +112,7 @@ namespace TackleboxDbg
             {
 
                 if (!coin._collectible._collected ||
-                        coinMgr._coinPoolMedium._entries.Contains(coin) || coinMgr._coinPoolMedium._entries.Contains(coin) || coinMgr._coinPoolLarge._entries.Contains(coin))
+                        coinMgr._coinPoolSmall._entries.Contains(coin) || coinMgr._coinPoolMedium._entries.Contains(coin) || coinMgr._coinPoolLarge._entries.Contains(coin))
                     continue;
                 coin._collectible._collected = false;
                 coin._artObject.SetActive(true);
@@ -128,8 +134,7 @@ namespace TackleboxDbg
             }
         }
 
-        static FieldInfo activeShredders = AccessTools.DeclaredField(typeof(ShredderManager), "_activeShredders");
-        static void BurrowShredders()
+        void BurrowShredders()
         {
             var shredMgr = FindFirstObjectByType<ShredderManager>();
             var activeShredderList = activeShredders.GetValue(shredMgr) as List<SandShredder>;
@@ -139,9 +144,38 @@ namespace TackleboxDbg
             }
         }
 
-        static void GiveWhistle()
+        void GiveWhistle()
         {
             Manager.GetPlayerMachine()._hasWhistle.SetValue(true);
+        }
+
+        void ResetMookCoins()
+        {
+            var mooks = FindObjectsByType<BasicMook>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            Logger.LogInfo("Mook Count: " + mooks.Length);
+            var saveData = Manager.GetSaveManager()?._currentSaveData;
+            if (saveData == null)
+                return;
+
+            foreach (var mook in mooks)
+            {
+                foreach(var collectible in mook._agent._collectibles)
+                {
+                    collectible._collected = false;
+                    var guid = collectible._asset._guid;
+                    if((saveData._collectibles?.Remove(guid)).GetValueOrDefault(false))
+                    {
+                        Logger.LogInfo("Reset coins for: " + mook._agent.ToString());
+                    }
+                    var emittedCoin = spewedCoin.GetValue(collectible) as Coin;
+                    if(emittedCoin != null && emittedCoin._isActiveAndEnabled)
+                    {
+                        Logger.LogInfo("Despawned coins for: " + mook._agent.ToString());
+                        emittedCoin._gameObject.SetActive(false);
+                        spewedCoin.SetValue(collectible, null);
+                    }
+                }
+            }
         }
     }
 }
