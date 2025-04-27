@@ -1,6 +1,7 @@
 ﻿using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
+using ImGuiNET;
 using System.Reflection;
 using UnityEngine;
 
@@ -55,6 +56,8 @@ namespace TackleboxDbg
             LoadStateKey = Config.Bind("Inputs", "LoadStateKey", new KeyboardShortcut(KeyCode.F4), "Load the saved game data");
             SaveStateKey = Config.Bind("Inputs", "SaveStateKey", new KeyboardShortcut(KeyCode.F3), "Save the current game data");
             OverrideDebugArrow = Config.Bind("Misc", "OverrideDbgArrow", true, "Changes Debug Arrow behavior to display the respawn area");
+
+            Patches.Layout += OnLayout;
         }
 
         private void Update()
@@ -87,6 +90,19 @@ namespace TackleboxDbg
                 {
                     SaveState.LoadSavedData();
                 }
+            }
+        }
+
+        private void OnLayout()
+        {
+            if (ImGui.BeginTabItem("Debug Mod"))
+            {
+                if (ImGui.CollapsingHeader("Save States"))
+                {
+                    ImGui.Text("Test Text");
+                    ImGui.RadioButton("Test Radio", false);
+                }
+                ImGui.EndTabItem();
             }
         }
 

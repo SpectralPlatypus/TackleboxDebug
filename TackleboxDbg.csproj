@@ -35,6 +35,9 @@
     <Reference Include="RG.ImGui">
       <HintPath>libs\RG.ImGui.dll</HintPath>
     </Reference>
+    <Reference Include="RG.ImGui.Unity">
+      <HintPath>libs\RG.ImGui.Unity.dll</HintPath>
+    </Reference>
     <Reference Include="Sirenix.Serialization">
       <HintPath>libs\Sirenix.Serialization.dll</HintPath>
     </Reference>
