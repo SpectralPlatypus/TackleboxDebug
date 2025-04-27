@@ -22,6 +22,16 @@ namespace TackleboxDbg
         public string[] SaveStateNames => 
             [.. SaveStateFiles.Select(Path.GetFileNameWithoutExtension)];
 
+        private SaveStateData CurrentData => new()
+        {
+            playerPos = Player._position,
+            lookDir = PlayerCamera._lookDirection,
+            facingDir = Player._currentFacingDirection,
+            health = Player._currentHealth,
+
+            SaveData = SaveManager._currentSaveData
+        };
+
         public SaveStateManager()
         {
             Directory.CreateDirectory(saveStatesPath);
@@ -40,14 +50,14 @@ namespace TackleboxDbg
                 name = "SaveState" + i.ToString();
             }
 
-            GetCurrentData().WriteToFile($"{saveStatesPath}/{name}.json");
+            CurrentData.WriteToFile($"{saveStatesPath}/{name}.json");
             SetCurrentIndexByName(name);
         }
 
         public void SaveCurrentDataToQuickSlot()
         {
             string path = saveStatesPath + "/(quickslot).json";
-            GetCurrentData().WriteToFile(path);
+            CurrentData.WriteToFile(path);
             SetCurrentIndexByName("(quickslot)");
         }
 
@@ -69,30 +79,6 @@ namespace TackleboxDbg
             Process.Start(saveStatesPath);
         }
 
-        private SaveStateData GetCurrentData()
-        {
-            SaveStateData data = new();
-
-            // The game either doesn't save or load the checkpoint rods properly, so I'm doing it manually here.
-            var zipList = GameObject.FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            foreach (var zip in zipList)
-            {
-                var ar = zip._activatedReference;
-                if (ar is null) continue;
-
-                data.ZipRings.Add(ar._guid, ar.GetValue());
-            }
-
-            data.playerPos = Player._position;
-            data.lookDir = PlayerCamera._lookDirection;
-            data.facingDir = Player._currentFacingDirection;
-            data.health = Player._currentHealth;
-
-            data.SaveData = SaveManager._currentSaveData;
-
-            return data;
-        }
-
         private void SetCurrentIndexByName(string name)
         {
             int i = Array.IndexOf(SaveStateNames, name);
@@ -108,16 +94,16 @@ namespace TackleboxDbg
             SaveManager.PrepareGameState(data.SaveData);
             MainMenu.LoadGameScene();
             yield return new WaitUntil(() => IsInGame);
-
-            // Load the saved zip ring values.
+            
+            // The game doesn't load the checkpoint rods properly, so I'm doing it manually here.
             var zipList = GameObject.FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             foreach (var zip in zipList)
             {
-                var ar = zip._activatedReference;
+                BoolVariableReference actRef = zip._activatedReference;
+                Dictionary<Guid, object> varRefs = data.SaveData._variableReferences;
+                if (actRef is null || !varRefs.ContainsKey(actRef._guid)) continue;
 
-                if (ar is null || !data.ZipRings.ContainsKey(ar._guid)) continue;
-
-                if (data.ZipRings[ar._guid]) zip.Activate(true);
+                if ((bool)varRefs[actRef._guid]) zip.Activate(true);
                 else zip.Deactivate(true);
             }
             
@@ -143,13 +129,6 @@ namespace TackleboxDbg
         public Vector3 lookDir;
         public Vector3 facingDir;
         public int health;
-
-        // Dictionaries don't get serialized properly so we're using lists instead.
-        [SerializeField]
-        private List<string> ZipRingKeys = [];
-        [SerializeField]
-        private List<bool> ZipRingValues = [];
-        public Dictionary<Guid, bool> ZipRings = [];
 
         [SerializeField]
         private string SaveDataString;
@@ -181,16 +160,10 @@ namespace TackleboxDbg
             if (!File.Exists(path)) return;
 
             JsonUtility.FromJsonOverwrite(File.ReadAllText(path), this);
-
-            ZipRings = ZipRingKeys
-                .Zip(ZipRingValues, (k, v) => new { k, v })
-                .ToDictionary(x => new Guid(x.k), x => x.v);
         }
 
         public void WriteToFile(string path)
         {
-            ZipRingKeys = [.. ZipRings.Keys.Select(k => k.ToString())];
-            ZipRingValues = [.. ZipRings.Values];
             File.WriteAllText(path, JsonUtility.ToJson(this, true));
         }
     }
