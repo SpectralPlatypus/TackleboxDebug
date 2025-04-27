@@ -1,9 +1,7 @@
 ﻿using HarmonyLib;
-using ImGuiNET;
 using System.Reflection;
 using System.Reflection.Emit;
 using UnityEngine;
-using UnityEngine.UIElements;
 using Label = System.Reflection.Emit.Label;
 
 namespace TackleboxDbg
@@ -74,13 +72,12 @@ namespace TackleboxDbg
 
         [HarmonyTranspiler]
         [HarmonyPatch(typeof(DearImGuiDemo), "OnLayout")]
-        static IEnumerable<CodeInstruction> UIShim(IEnumerable<CodeInstruction> instructions, ILGenerator il)
+        static IEnumerable<CodeInstruction> CustomTabPatch(IEnumerable<CodeInstruction> instructions, ILGenerator il)
         {
             return
                 new CodeMatcher(instructions, il)
                 .MatchForward(false,
                     new CodeMatch(OpCodes.Call, typeof(ImGuiNET.ImGui).GetMethod("EndTabBar")))
-                //.Advance(1)
                 .SetAndAdvance(OpCodes.Ldsfld, typeof(Patches).GetField("Layout", BindingFlags.NonPublic|BindingFlags.Static))
                 .InsertAndAdvance(new CodeInstruction(OpCodes.Callvirt, typeof(System.Action).GetMethod("Invoke")))
                 .Insert(new CodeInstruction(OpCodes.Call, typeof(ImGuiNET.ImGui).GetMethod("EndTabBar")))
