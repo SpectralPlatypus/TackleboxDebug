@@ -151,26 +151,39 @@ namespace TackleboxDbg
 
         void ResetMookCoins()
         {
-            var mooks = FindObjectsByType<BasicMook>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            Logger.LogInfo("Mook Count: " + mooks.Length);
+            var mooks = FindObjectsByType<BasicMook>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            var turretMooks = FindObjectsByType<MortarDesertMook>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
             var saveData = Manager.GetSaveManager()?._currentSaveData;
             if (saveData == null)
                 return;
 
             foreach (var mook in mooks)
             {
-                foreach(var collectible in mook._agent._collectibles)
+                ResetAgentCollectibles(mook._agent, saveData);
+            }
+
+            foreach (var mook in turretMooks)
+            {
+                ResetAgentCollectibles(mook._headAgent, saveData);
+            }
+        }
+
+        void ResetAgentCollectibles(FiletNavAgent agent, SaveData saveData)
+        {
+            foreach (var collectible in agent._collectibles)
+            {
+                collectible._collected = false;
+                var guid = collectible._asset._guid;
+                if ((saveData._collectibles?.Remove(guid)).GetValueOrDefault(false))
                 {
-                    collectible._collected = false;
-                    var guid = collectible._asset._guid;
-                    if((saveData._collectibles?.Remove(guid)).GetValueOrDefault(false))
-                    {
-                        Logger.LogInfo("Reset coins for: " + mook._agent.ToString());
-                    }
+                    Logger.LogDebug("Reset coins for: " + agent.ToString());
+                }
+                else
+                {
                     var emittedCoin = spewedCoin.GetValue(collectible) as Coin;
-                    if(emittedCoin != null && emittedCoin._isActiveAndEnabled)
+                    if (emittedCoin != null && emittedCoin._isActiveAndEnabled)
                     {
-                        Logger.LogInfo("Despawned coins for: " + mook._agent.ToString());
+                        Logger.LogDebug("Despawned coins for: " + agent.ToString());
                         emittedCoin._gameObject.SetActive(false);
                         spewedCoin.SetValue(collectible, null);
                     }
