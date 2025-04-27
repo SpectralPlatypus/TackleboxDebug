@@ -1,66 +1,109 @@
 using System.Collections;
+using System.Diagnostics;
 using UnityEngine;
-using UnityEngine.TextCore.Text;
-using UnityEngine.UIElements;
 
 namespace TackleboxDbg
 {
-    static class SaveStateManager
+    class SaveStateManager
     {
-        private static readonly string saveStatesPath = Application.persistentDataPath + "/SaveStates";
-        private static MainMenu MainMenu => Manager.GetMainMenu();
-        private static PlayerMachine Player => Manager.GetPlayerMachine();
-        private static SaveManager SaveManager => Manager.GetSaveManager();
-        private static PlayerCamera PlayerCamera => Manager.GetPlayerCamera();
-        private static bool IsInGame => MainMenu._currentState == MainMenu._inGameState;
-        public static void Init()
+        private readonly string saveStatesPath = Application.persistentDataPath + "/SaveStates";
+        private MainMenu MainMenu => Manager.GetMainMenu();
+        private PlayerMachine Player => Manager.GetPlayerMachine();
+        private SaveManager SaveManager => Manager.GetSaveManager();
+        private PlayerCamera PlayerCamera => Manager.GetPlayerCamera();
+
+        public bool IsInGame => 
+            MainMenu._currentState == MainMenu._inGameState || 
+            MainMenu._currentState == MainMenu._gameplayState;
+
+        public int CurrentIndex;
+        private string[] SaveStateFiles =>
+            [.. Directory.GetFiles(saveStatesPath).Where(x => x.EndsWith(".json"))];
+        public string[] SaveStateNames => 
+            [.. SaveStateFiles.Select(Path.GetFileNameWithoutExtension)];
+
+        public SaveStateManager()
         {
             Directory.CreateDirectory(saveStatesPath);
         }
 
-        public static void SaveCurrentData()
+        public void SaveCurrentDataToNewFile()
         {
-            if(!IsInGame) return;
+            if (!IsInGame) return;
+            
+            int i = 1;
+            string name = "SaveState";
 
-            GetCurrentData().WriteToFile(saveStatesPath + "/savestate.json");
+            while(File.Exists($"{saveStatesPath}/{name}.json"))
+            {
+                i++;
+                name = "SaveState" + i.ToString();
+            }
+
+            GetCurrentData().WriteToFile($"{saveStatesPath}/{name}.json");
+            SetCurrentIndexByName(name);
         }
 
-        public static void LoadSavedData()
+        public void SaveCurrentDataToQuickSlot()
         {
-            if(!IsInGame) return;
-            Manager._instance.StartCoroutine(LoadSaveStateRoutine());
+            string path = saveStatesPath + "/(quickslot).json";
+            GetCurrentData().WriteToFile(path);
+            SetCurrentIndexByName("(quickslot)");
         }
 
-        private static SaveStateData GetCurrentData()
+        public void LoadCurrent()
+        {
+            string path = Directory.GetFiles(saveStatesPath).ElementAt(CurrentIndex);
+            if (IsInGame)
+                Manager._instance.StartCoroutine(LoadSaveStateRoutine(path));
+        }
+
+        public void DeleteCurrent()
+        {
+            File.Delete(SaveStateFiles[CurrentIndex]);
+            if(CurrentIndex == SaveStateFiles.Length) CurrentIndex--;
+        }
+
+        public void OpenSaveStateFolder()
+        {
+            Process.Start(saveStatesPath);
+        }
+
+        private SaveStateData GetCurrentData()
         {
             SaveStateData data = new();
 
             // The game either doesn't save or load the checkpoint rods properly, so I'm doing it manually here.
             var zipList = GameObject.FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            foreach(var zip in zipList)
+            foreach (var zip in zipList)
             {
                 var ar = zip._activatedReference;
-                if(ar is null) continue;
-                
+                if (ar is null) continue;
+
                 data.ZipRings.Add(ar._guid, ar.GetValue());
             }
-        
+
             data.playerPos = Player._position;
             data.lookDir = PlayerCamera._lookDirection;
             data.facingDir = Player._currentFacingDirection;
             data.health = Player._currentHealth;
-            
+
             data.SaveData = SaveManager._currentSaveData;
 
             return data;
         }
 
-        private static IEnumerator LoadSaveStateRoutine()
+        private void SetCurrentIndexByName(string name)
         {
-            string currentSavePath = saveStatesPath + "/savestate.json";
-            if(!File.Exists(currentSavePath)) yield break;
+            int i = Array.IndexOf(SaveStateNames, name);
+            if(i != -1) CurrentIndex = i;
+        }
 
-            SaveStateData data = new(currentSavePath);
+        private IEnumerator LoadSaveStateRoutine(string path)
+        {
+            if (!File.Exists(path)) yield break;
+
+            SaveStateData data = new(path);
 
             SaveManager.PrepareGameState(data.SaveData);
             MainMenu.LoadGameScene();
@@ -68,26 +111,31 @@ namespace TackleboxDbg
 
             // Load the saved zip ring values.
             var zipList = GameObject.FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            foreach(var zip in zipList)
+            foreach (var zip in zipList)
             {
                 var ar = zip._activatedReference;
 
-                if(ar is null || !data.ZipRings.ContainsKey(ar._guid)) continue;
+                if (ar is null || !data.ZipRings.ContainsKey(ar._guid)) continue;
 
-                if(data.ZipRings[ar._guid]) zip.Activate(true);
+                if (data.ZipRings[ar._guid]) zip.Activate(true);
                 else zip.Deactivate(true);
             }
-
-            Player.Teleport(data.playerPos);
-            PlayerCamera.SetLookDirection(data.lookDir);
-            Player._targetFacingDirection = data.facingDir;
-            Player._currentFacingDirection = data.facingDir;
+            
+            if(data.playerPos != Vector3.zero) 
+                Player.Teleport(data.playerPos);
+            if(data.lookDir != Vector3.zero)
+                PlayerCamera.SetLookDirection(data.lookDir);
+            if(data.facingDir != Vector3.zero)
+            {
+                Player._targetFacingDirection = data.facingDir;
+                Player._currentFacingDirection = data.facingDir;
+            }
 
             yield return new WaitUntil(() => Player._currentHealth == 3);
-            if(0 < data.health && data.health < 3) Player.SetCurrentHealth(data.health);
+            if (0 < data.health && data.health < 3) Player.SetCurrentHealth(data.health);
         }
     }
-    
+
     [Serializable]
     public class SaveStateData
     {
@@ -121,7 +169,7 @@ namespace TackleboxDbg
                 SaveDataString = JsonUtility.ToJson(value);
             }
         }
-        
+
         public SaveStateData() { }
 
         /// <summary>
@@ -130,12 +178,12 @@ namespace TackleboxDbg
         /// <param name="path">The path of the .json file to read from.</param>
         public SaveStateData(string path)
         {
-            if(!File.Exists(path)) return;
+            if (!File.Exists(path)) return;
 
             JsonUtility.FromJsonOverwrite(File.ReadAllText(path), this);
 
             ZipRings = ZipRingKeys
-                .Zip(ZipRingValues, (k, v) => new {k, v})
+                .Zip(ZipRingValues, (k, v) => new { k, v })
                 .ToDictionary(x => new Guid(x.k), x => x.v);
         }
 

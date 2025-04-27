@@ -33,6 +33,8 @@ namespace TackleboxDbg
         static FieldInfo activeShredders = AccessTools.DeclaredField(typeof(ShredderManager), "_activeShredders");
         #endregion
 
+        SaveStateManager SSManager;
+
         private void Awake()
         {
             // Plugin startup logic
@@ -57,7 +59,7 @@ namespace TackleboxDbg
             SaveStateKey = Config.Bind("Inputs", "SaveStateKey", new KeyboardShortcut(KeyCode.F3), "Save the current game data");
             OverrideDebugArrow = Config.Bind("Misc", "OverrideDbgArrow", true, "Changes Debug Arrow behavior to display the respawn area");
 
-            SaveStateManager.Init();
+            SSManager = new();
         }
 
         private void OnEnable()
@@ -94,23 +96,44 @@ namespace TackleboxDbg
                 }
                 if(SaveStateKey.Value.IsDown())
                 {
-                    SaveStateManager.SaveCurrentData();
+                    SSManager.SaveCurrentDataToQuickSlot();
                 }
                 if(LoadStateKey.Value.IsDown())
                 {
-                    SaveStateManager.LoadSavedData();
+                    SSManager.LoadCurrent();
                 }
             }
         }
 
         private void OnLayout()
         {
-            if (ImGui.BeginTabItem("Debug Mod"))
+            if (ImGui.BeginTabItem("Tacklebox Debug"))
             {
-                if (ImGui.CollapsingHeader("Save States"))
+                if (ImGui.CollapsingHeader("SaveStates"))
                 {
-                    ImGui.Text("Test Text");
-                    ImGui.RadioButton("Test Radio", false);
+                    if (SSManager.IsInGame && ImGui.Button("Load"))
+                    {
+                        SSManager.LoadCurrent();
+                    }
+                    
+                    ImGui.ListBox("", ref SSManager.CurrentIndex, SSManager.SaveStateNames, SSManager.SaveStateNames.Length, 10);
+
+                    if (ImGui.Button("Delete"))
+                    {
+                        SSManager.DeleteCurrent();
+                    }
+                    if (SSManager.IsInGame)
+                    {
+                        ImGui.SameLine();
+                        if(ImGui.Button("Create"))
+                        {
+                            SSManager.SaveCurrentDataToNewFile();
+                        }
+                    }
+                    if (ImGui.Button("Open SaveStates Folder"))
+                    {
+                        SSManager.OpenSaveStateFolder();
+                    }
                 }
                 ImGui.EndTabItem();
             }
