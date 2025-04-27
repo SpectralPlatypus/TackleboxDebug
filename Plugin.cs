@@ -56,8 +56,16 @@ namespace TackleboxDbg
             LoadStateKey = Config.Bind("Inputs", "LoadStateKey", new KeyboardShortcut(KeyCode.F4), "Load the saved game data");
             SaveStateKey = Config.Bind("Inputs", "SaveStateKey", new KeyboardShortcut(KeyCode.F3), "Save the current game data");
             OverrideDebugArrow = Config.Bind("Misc", "OverrideDbgArrow", true, "Changes Debug Arrow behavior to display the respawn area");
+        }
 
+        private void OnEnable()
+        {
             Patches.Layout += OnLayout;
+        }
+
+        private void OnDisable()
+        {
+            Patches.Layout -= OnLayout;
         }
 
         private void Update()
