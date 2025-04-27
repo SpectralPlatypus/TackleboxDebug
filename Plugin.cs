@@ -1,6 +1,7 @@
 ﻿using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
+using ImGuiNET;
 using System.Reflection;
 using UnityEngine;
 
@@ -57,6 +58,16 @@ namespace TackleboxDbg
             OverrideDebugArrow = Config.Bind("Misc", "OverrideDbgArrow", true, "Changes Debug Arrow behavior to display the respawn area");
         }
 
+        private void OnEnable()
+        {
+            Patches.Layout += OnLayout;
+        }
+
+        private void OnDisable()
+        {
+            Patches.Layout -= OnLayout;
+        }
+
         private void Update()
         {
             if (ToggleDebugKey.Value.IsDown())
@@ -87,6 +98,19 @@ namespace TackleboxDbg
                 {
                     SaveState.LoadSavedData();
                 }
+            }
+        }
+
+        private void OnLayout()
+        {
+            if (ImGui.BeginTabItem("Debug Mod"))
+            {
+                if (ImGui.CollapsingHeader("Save States"))
+                {
+                    ImGui.Text("Test Text");
+                    ImGui.RadioButton("Test Radio", false);
+                }
+                ImGui.EndTabItem();
             }
         }
 
