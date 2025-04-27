@@ -2,12 +2,15 @@
 using System.Reflection;
 using System.Reflection.Emit;
 using UnityEngine;
+using Label = System.Reflection.Emit.Label;
 
 namespace TackleboxDbg
 {
     [HarmonyPatch]
     internal class Patches
     {
+        public static event Action Layout;
+
         [HarmonyTranspiler]
         [HarmonyPatch(typeof(Coin), "CollectRoutine", MethodType.Enumerator)]
         static IEnumerable<CodeInstruction> TranspileMoveNext(IEnumerable<CodeInstruction> instructions, ILGenerator il)
@@ -67,6 +70,19 @@ namespace TackleboxDbg
             return codes.AsEnumerable();
         }
 
+        [HarmonyTranspiler]
+        [HarmonyPatch(typeof(DearImGuiDemo), "OnLayout")]
+        static IEnumerable<CodeInstruction> CustomTabPatch(IEnumerable<CodeInstruction> instructions, ILGenerator il)
+        {
+            return
+                new CodeMatcher(instructions, il)
+                .MatchForward(false,
+                    new CodeMatch(OpCodes.Call, typeof(ImGuiNET.ImGui).GetMethod("EndTabBar")))
+                .SetAndAdvance(OpCodes.Ldsfld, typeof(Patches).GetField("Layout", BindingFlags.NonPublic|BindingFlags.Static))
+                .InsertAndAdvance(new CodeInstruction(OpCodes.Callvirt, typeof(System.Action).GetMethod("Invoke")))
+                .Insert(new CodeInstruction(OpCodes.Call, typeof(ImGuiNET.ImGui).GetMethod("EndTabBar")))
+                .InstructionEnumeration();
+        }
 
         static MethodInfo dynMethod = typeof(PlayerMachine).GetMethod("BestValidGroundFromHistory", BindingFlags.NonPublic | BindingFlags.Instance);
         [HarmonyPatch(typeof(CheckpointUI), nameof(Checkpoint.ManagedFixedUpdate))]
