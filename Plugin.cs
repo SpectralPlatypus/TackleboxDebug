@@ -25,6 +25,7 @@ namespace TackleboxDbg
         ConfigEntry<KeyboardShortcut> SaveStateKey;
         ConfigEntry<KeyboardShortcut> LoadStateKey;
         ConfigEntry<KeyboardShortcut> GiveWhistleKey;
+        ConfigEntry<KeyboardShortcut> ResetCheckpointsKey;
         public static ConfigEntry<bool> OverrideDebugArrow;
         #endregion
 
@@ -54,9 +55,10 @@ namespace TackleboxDbg
             ToggleDebugKey = Config.Bind("Inputs", "ToggleDebug", new KeyboardShortcut(KeyCode.F11), "The key for toggling Debug HUD");
             RespawnCollectiblesKey = Config.Bind("Inputs", "RespawnCollectibles", new KeyboardShortcut(KeyCode.F10), "Respawn Coins/Fish");
             ClearShreddersKey = Config.Bind("Inputs", "ClearShredders", new KeyboardShortcut(KeyCode.F9), "Despawn untethered shredders");
-            GiveWhistleKey = Config.Bind("Inputs", "GiveWhistleKey", new KeyboardShortcut(KeyCode.F8), "Give the player the whistle");
-            LoadStateKey = Config.Bind("Inputs", "LoadStateKey", new KeyboardShortcut(KeyCode.F4), "Load the saved game data");
-            SaveStateKey = Config.Bind("Inputs", "SaveStateKey", new KeyboardShortcut(KeyCode.F3), "Save the current game data");
+            GiveWhistleKey = Config.Bind("Inputs", "GiveWhistle", new KeyboardShortcut(KeyCode.F8), "Give the player the whistle");
+            ResetCheckpointsKey = Config.Bind("Inputs", "ResetCheckpoints", new KeyboardShortcut(KeyCode.F7), "Give the player the whistle");
+            LoadStateKey = Config.Bind("Inputs", "LoadState", new KeyboardShortcut(KeyCode.F4), "Load the saved game data");
+            SaveStateKey = Config.Bind("Inputs", "SaveState", new KeyboardShortcut(KeyCode.F3), "Save the current game data");
             OverrideDebugArrow = Config.Bind("Misc", "OverrideDbgArrow", true, "Changes Debug Arrow behavior to display the respawn area");
 
             SSManager = new();
@@ -93,6 +95,10 @@ namespace TackleboxDbg
                 if(GiveWhistleKey.Value.IsDown())
                 {
                     GiveWhistle();
+                }
+                if(ResetCheckpointsKey.Value.IsDown())
+                {
+                    ResetCheckpoints();
                 }
                 if(SaveStateKey.Value.IsDown())
                 {
@@ -179,11 +185,14 @@ namespace TackleboxDbg
             coinMgr._coinPoolSmall.DisableAll();
             coinMgr._coinPoolMedium.DisableAll();
             coinMgr._coinPoolLarge.DisableAll();
-            
+        }
+        
+        void ResetCheckpoints()
+        {
             var zipList = FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             foreach(var zip in zipList)
             {
-                if(zip._activatedReference is not null)
+                if(zip._activatedReference is not null && zip._activatedReference.GetValue())
                     // The zips don't instant-deactivate properly if they're active.
                     zip.Deactivate(IsInstant: !zip._gameObject.activeInHierarchy);
             }
