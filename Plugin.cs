@@ -24,6 +24,7 @@ namespace TackleboxDbg
         ConfigEntry<KeyboardShortcut> ClearShreddersKey;
         ConfigEntry<KeyboardShortcut> SaveStateKey;
         ConfigEntry<KeyboardShortcut> LoadStateKey;
+        ConfigEntry<KeyboardShortcut> TeleportStateKey;
         ConfigEntry<KeyboardShortcut> GiveWhistleKey;
         ConfigEntry<KeyboardShortcut> ResetCheckpointsKey;
         public static ConfigEntry<bool> OverrideDebugArrow;
@@ -57,6 +58,7 @@ namespace TackleboxDbg
             ClearShreddersKey = Config.Bind("Inputs", "ClearShredders", new KeyboardShortcut(KeyCode.F9), "Despawn untethered shredders");
             GiveWhistleKey = Config.Bind("Inputs", "GiveWhistle", new KeyboardShortcut(KeyCode.F8), "Give the player the whistle");
             ResetCheckpointsKey = Config.Bind("Inputs", "ResetCheckpoints", new KeyboardShortcut(KeyCode.F7), "Give the player the whistle");
+            TeleportStateKey = Config.Bind("Inputs", "TeleportState", new KeyboardShortcut(KeyCode.F5), "Teleport to the saved game data's position");
             LoadStateKey = Config.Bind("Inputs", "LoadState", new KeyboardShortcut(KeyCode.F4), "Load the saved game data");
             SaveStateKey = Config.Bind("Inputs", "SaveState", new KeyboardShortcut(KeyCode.F3), "Save the current game data");
             OverrideDebugArrow = Config.Bind("Misc", "OverrideDbgArrow", true, "Changes Debug Arrow behavior to display the respawn area");
@@ -107,6 +109,10 @@ namespace TackleboxDbg
                 if(LoadStateKey.Value.IsDown())
                 {
                     SSManager.LoadCurrent();
+                }
+                if(TeleportStateKey.Value.IsDown())
+                {
+                    SSManager.LoadCurrentNonSaveData();
                 }
             }
         }
