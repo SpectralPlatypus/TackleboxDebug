@@ -4,11 +4,14 @@ A small [BepInEx](https://github.com/BepInEx/BepInEx) mod for enabling the other
 
 ## Usage
 
-`<F11>` toggles debug state and ImGUI menu. While the debug state is active, the following inputs can be used:
+`<F11>` Toggles Debug state and ImGUI menu. While the debug state is active, the following inputs can be used:
 - `<F1>` Quick warp
 - `<F2>` Toggle Noclip
-- `<F7>` Save game data
-- `<F8>` Load game data
+- `<F3>` Create temporary SaveState
+- `<F4>` Load SaveState
+- `<F5>` Teleport to SaveState position
+- `<F7>` Reset Checkpoints
+- `<F8>` Give Whistle
 - `<F9>` Clear Shredders
 - `<F10>` Respawn Collectibles/Reset Checkpoint Rods
 - `<Q/E>` Change altitude in noclip mode

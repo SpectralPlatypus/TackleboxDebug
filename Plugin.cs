@@ -24,7 +24,9 @@ namespace TackleboxDbg
         ConfigEntry<KeyboardShortcut> ClearShreddersKey;
         ConfigEntry<KeyboardShortcut> SaveStateKey;
         ConfigEntry<KeyboardShortcut> LoadStateKey;
+        ConfigEntry<KeyboardShortcut> TeleportStateKey;
         ConfigEntry<KeyboardShortcut> GiveWhistleKey;
+        ConfigEntry<KeyboardShortcut> ResetCheckpointsKey;
         public static ConfigEntry<bool> OverrideDebugArrow;
         #endregion
 
@@ -32,6 +34,8 @@ namespace TackleboxDbg
         static FieldInfo spewedCoin = AccessTools.DeclaredField(typeof(Collectible), "_spewedCoin");
         static FieldInfo activeShredders = AccessTools.DeclaredField(typeof(ShredderManager), "_activeShredders");
         #endregion
+
+        SaveStateManager SSManager;
 
         private void Awake()
         {
@@ -52,10 +56,14 @@ namespace TackleboxDbg
             ToggleDebugKey = Config.Bind("Inputs", "ToggleDebug", new KeyboardShortcut(KeyCode.F11), "The key for toggling Debug HUD");
             RespawnCollectiblesKey = Config.Bind("Inputs", "RespawnCollectibles", new KeyboardShortcut(KeyCode.F10), "Respawn Coins/Fish");
             ClearShreddersKey = Config.Bind("Inputs", "ClearShredders", new KeyboardShortcut(KeyCode.F9), "Despawn untethered shredders");
-            GiveWhistleKey = Config.Bind("Inputs", "GiveWhistleKey", new KeyboardShortcut(KeyCode.F8), "Give the player the whistle");
-            LoadStateKey = Config.Bind("Inputs", "LoadStateKey", new KeyboardShortcut(KeyCode.F4), "Load the saved game data");
-            SaveStateKey = Config.Bind("Inputs", "SaveStateKey", new KeyboardShortcut(KeyCode.F3), "Save the current game data");
+            GiveWhistleKey = Config.Bind("Inputs", "GiveWhistle", new KeyboardShortcut(KeyCode.F8), "Give the player the whistle");
+            ResetCheckpointsKey = Config.Bind("Inputs", "ResetCheckpoints", new KeyboardShortcut(KeyCode.F7), "Give the player the whistle");
+            TeleportStateKey = Config.Bind("Inputs", "TeleportState", new KeyboardShortcut(KeyCode.F5), "Teleport to the saved game data's position");
+            LoadStateKey = Config.Bind("Inputs", "LoadState", new KeyboardShortcut(KeyCode.F4), "Load the saved game data");
+            SaveStateKey = Config.Bind("Inputs", "SaveState", new KeyboardShortcut(KeyCode.F3), "Save the current game data");
             OverrideDebugArrow = Config.Bind("Misc", "OverrideDbgArrow", true, "Changes Debug Arrow behavior to display the respawn area");
+
+            SSManager = new();
         }
 
         private void OnEnable()
@@ -90,25 +98,62 @@ namespace TackleboxDbg
                 {
                     GiveWhistle();
                 }
+                if(ResetCheckpointsKey.Value.IsDown())
+                {
+                    ResetCheckpoints();
+                }
                 if(SaveStateKey.Value.IsDown())
                 {
-                    SaveState.SaveCurrentData();
+                    SSManager.SaveCurrentDataToQuickSlot();
                 }
                 if(LoadStateKey.Value.IsDown())
                 {
-                    SaveState.LoadSavedData();
+                    SSManager.LoadCurrent();
+                }
+                if(TeleportStateKey.Value.IsDown())
+                {
+                    SSManager.LoadCurrentNonSaveData();
                 }
             }
         }
 
         private void OnLayout()
         {
-            if (ImGui.BeginTabItem("Debug Mod"))
+            if (ImGui.BeginTabItem("Tacklebox Debug"))
             {
-                if (ImGui.CollapsingHeader("Save States"))
+                if (ImGui.CollapsingHeader("SaveStates"))
                 {
-                    ImGui.Text("Test Text");
-                    ImGui.RadioButton("Test Radio", false);
+                    if (SSManager.IsInGame)
+                    {
+                        if(ImGui.Button("Load"))
+                        {
+                            SSManager.LoadCurrent();
+                        }
+                        ImGui.SameLine();
+                        if(ImGui.Button("Teleport"))
+                        {
+                            SSManager.LoadCurrentNonSaveData();
+                        }
+                    }
+                    
+                    ImGui.ListBox("", ref SSManager.CurrentIndex, SSManager.SaveStateNames, SSManager.SaveStateNames.Length, 10);
+
+                    if (ImGui.Button("Delete"))
+                    {
+                        SSManager.DeleteCurrent();
+                    }
+                    if (SSManager.IsInGame)
+                    {
+                        ImGui.SameLine();
+                        if(ImGui.Button("Create"))
+                        {
+                            SSManager.SaveCurrentDataToNewFile();
+                        }
+                    }
+                    if (ImGui.Button("Open SaveStates Folder"))
+                    {
+                        SSManager.OpenSaveStateFolder();
+                    }
                 }
                 ImGui.EndTabItem();
             }
@@ -146,15 +191,16 @@ namespace TackleboxDbg
             coinMgr._coinPoolSmall.DisableAll();
             coinMgr._coinPoolMedium.DisableAll();
             coinMgr._coinPoolLarge.DisableAll();
-            
+        }
+        
+        void ResetCheckpoints()
+        {
             var zipList = FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             foreach(var zip in zipList)
             {
-                if(!zip._startsActivated)
-                {
+                if(zip._activatedReference is not null && zip._activatedReference.GetValue())
                     // The zips don't instant-deactivate properly if they're active.
                     zip.Deactivate(IsInstant: !zip._gameObject.activeInHierarchy);
-                }
             }
         }
 

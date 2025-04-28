@@ -1,105 +1,194 @@
 using System.Collections;
+using System.Diagnostics;
 using UnityEngine;
 
 namespace TackleboxDbg
 {
-    static class SaveState
+    class SaveStateManager
     {
-        static readonly string savestatePath = Application.persistentDataPath + "/savestate.json";
+        private readonly string saveStatesPath = Application.persistentDataPath + "/SaveStates";
+        private MainMenu MainMenu => Manager.GetMainMenu();
+        private PlayerMachine Player => Manager.GetPlayerMachine();
+        private SaveManager SaveManager => Manager.GetSaveManager();
+        private PlayerCamera PlayerCamera => Manager.GetPlayerCamera();
 
-        // Temporary values; these are not saved on game restart.
-        // Should probably either delete the savestate.json on game close or find a way to save these values in savestate.json or otherwise.
-        static Vector3 savedSpawnTransPos;
-        static Vector3 savedPlayerPos;
-        static Vector3 savedLookDir;
-        static Vector3 savedFacingDir;
-        static int savedHealth;
-        static readonly Dictionary<Guid, bool> zipRingValues = [];
-        
-        public static void SaveCurrentData()
+        public bool IsInGame => 
+            MainMenu._currentState == MainMenu._inGameState || 
+            MainMenu._currentState == MainMenu._gameplayState;
+
+        public int CurrentIndex;
+        private string[] SaveStateFiles => 
+            [.. Directory.GetFiles(saveStatesPath).Where(x => x.EndsWith(".json"))];
+        public string[] SaveStateNames => 
+            [.. SaveStateFiles.Select(Path.GetFileNameWithoutExtension)];
+
+        private SaveStateData CurrentData => new()
         {
-            // The game either doesn't save or load the checkpoint rods properly, so I'm doing it manually here.
-            zipRingValues.Clear();
-            var zipList = GameObject.FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            foreach(var zip in zipList)
+            playerPos = Player._position,
+            lookDir = PlayerCamera._lookDirection,
+            facingDir = Player._currentFacingDirection,
+            health = Player._currentHealth,
+            safeMortarIsland = GetMortarIslandMook()._currentState == MortarDesertMook._states.Dead,
+
+            SaveData = SaveManager._currentSaveData
+        };
+
+        private MortarDesertMook GetMortarIslandMook()
+        {
+            return GameObject.FindObjectsByType<MortarDesertMook>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                .Where(x => !x._canRespawn)
+                .First();
+        }
+
+        public SaveStateManager()
+        {
+            Directory.CreateDirectory(saveStatesPath);
+        }
+
+        public void SaveCurrentDataToNewFile()
+        {
+            if (!IsInGame) return;
+            
+            int i = 1;
+            string name = "SaveState";
+
+            while(File.Exists($"{saveStatesPath}/{name}.json"))
             {
-                var ar = zip._activatedReference;
-                if(ar is null) continue;
-                
-                zipRingValues.Add(ar._guid, ar.GetValue());
+                i++;
+                name = "SaveState " + i.ToString();
             }
 
-            savedSpawnTransPos = Manager.GetPlayerMachine()._spawnTransform.position;
-            savedPlayerPos = Manager.GetPlayerMachine()._position;
-            savedLookDir = Manager.GetPlayerCamera()._lookDirection;
-            savedFacingDir = Manager.GetPlayerMachine()._currentFacingDirection;
-            savedHealth = Manager.GetPlayerMachine()._currentHealth;
-            
-            string contents = JsonUtility.ToJson(Manager.GetSaveManager()._currentSaveData);
-            File.WriteAllText(savestatePath, contents);
-        }
-        public static void LoadSavedData()
-        {
-            Manager._instance.StartCoroutine(LoadSavestateRoutine());
+            CurrentData.WriteToFile($"{saveStatesPath}/{name}.json");
+            SetCurrentIndexByName(name);
         }
 
-        private static IEnumerator LoadSavestateRoutine()
+        public void SaveCurrentDataToQuickSlot()
         {
-            if(Manager.GetMainMenu()._currentState != Manager.GetMainMenu()._inGameState) yield break;
+            string path = saveStatesPath + "/(quickslot).json";
+            CurrentData.WriteToFile(path);
+            SetCurrentIndexByName("(quickslot)");
+        }
+
+        public void LoadCurrent()
+        {
+            string path = Directory.GetFiles(saveStatesPath).ElementAt(CurrentIndex);
+            if (IsInGame)
+                Manager._instance.StartCoroutine(LoadSaveStateRoutine(path));
+        }
+
+        public void DeleteCurrent()
+        {
+            File.Delete(SaveStateFiles[CurrentIndex]);
+            if(CurrentIndex == SaveStateFiles.Length) CurrentIndex--;
+        }
+
+        public void OpenSaveStateFolder()
+        {
+            Process.Start(saveStatesPath);
+        }
+
+        public void LoadCurrentNonSaveData()
+        {
+            SaveStateData data = new(SaveStateFiles[CurrentIndex]);
+            Manager._instance.StartCoroutine(LoadStateDataRoutine(data));
+        }
+
+        private void SetCurrentIndexByName(string name)
+        {
+            int i = Array.IndexOf(SaveStateNames, name);
+            if(i != -1) CurrentIndex = i;
+        }
+
+        private IEnumerator LoadSaveStateRoutine(string path)
+        {
+            if (!File.Exists(path)) yield break;
+
+            SaveStateData data = new(path);
+
+            SaveManager.PrepareGameState(data.SaveData);
+            MainMenu.LoadGameScene();
+            yield return new WaitUntil(() => IsInGame);
             
-            SaveData data = new();
-            string contents = File.ReadAllText(savestatePath);
-            JsonUtility.FromJsonOverwrite(contents, data);
-            // May want to use a slot that is either in use or not in use, depending on how we want to implement it. 
-            // Just going to make a temporary save for now.
-            data.name = "tempSave";
-            Manager.GetSaveManager().PrepareGameState(data);
-
-            Manager.GetMainMenu().LoadGameScene();
-            yield return new WaitUntil(() => Manager.GetMainMenu()._currentState == Manager.GetMainMenu()._inGameState);
-
-            // Load the saved zip ring values.
-            var zipList = GameObject.FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            foreach(var zip in zipList)
+            // The game doesn't load the checkpoint rods properly, so I'm doing it manually here.
+            ZipRing[] zipList = GameObject.FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            Dictionary<Guid, object> varRefs = data.SaveData._variableReferences;
+            foreach (ZipRing zip in zipList)
             {
-                var ar = zip._activatedReference;
+                BoolVariableReference actRef = zip._activatedReference;
+                if (actRef is null || !varRefs.ContainsKey(actRef._guid)) continue;
 
-                if(ar is null) continue;
-                if(!zipRingValues.ContainsKey(ar._guid)) continue;
-
-                if(zipRingValues[ar._guid]) zip.Activate(true);
+                if ((bool)varRefs[actRef._guid]) zip.Activate(true);
                 else zip.Deactivate(true);
             }
 
-            PlayerMachine player = Manager.GetPlayerMachine();
+            yield return LoadStateDataRoutine(data, true);
+        }
 
-            if(savedSpawnTransPos != Vector3.zero) // Probably find a better way of doing this?
+        private IEnumerator LoadStateDataRoutine(SaveStateData data, bool waitToSetHealth = false)
+        {
+            if(data.playerPos != Vector3.zero) 
+                Player.Teleport(data.playerPos);
+            if(data.lookDir != Vector3.zero)
+                PlayerCamera.SetLookDirection(data.lookDir);
+            if(data.facingDir != Vector3.zero)
             {
-                player._spawnTransform.position = savedSpawnTransPos;
+                Player._targetFacingDirection = data.facingDir;
+                Player._currentFacingDirection = data.facingDir;
             }
 
-            if(savedPlayerPos != Vector3.zero) // Probably find a better way of doing this?
-            {
-                player.Teleport(savedPlayerPos);
-            }
+            if(waitToSetHealth) yield return new WaitUntil(() => Player._currentHealth == 3);
+            if (0 < data.health && data.health < 3) Player.SetCurrentHealth(data.health);
 
-            if(savedLookDir != Vector3.zero) // Probably find a better way of doing this?
-            {
-                Manager.GetPlayerCamera().SetLookDirection(savedLookDir);
-            }
+            MortarDesertMook mook = GetMortarIslandMook();
+            if(data.safeMortarIsland) mook.Kill(Vector3.zero);
+            else mook._headAgent.Respawn();
+        }
+    }
 
-            if(savedFacingDir != Vector3.zero)
-            {
-                player._targetFacingDirection = savedFacingDir;
-                player._currentFacingDirection = savedFacingDir;
-            }
+    [Serializable]
+    public class SaveStateData
+    {
+        public Vector3 playerPos;
+        public Vector3 lookDir;
+        public Vector3 facingDir;
+        public int health;
+        public bool safeMortarIsland;
 
-            yield return new WaitUntil(() => player._currentHealth == 3);
-
-            if(0 < savedHealth && savedHealth < 3)
+        [SerializeField]
+        private string SaveDataString;
+        public SaveData SaveData
+        {
+            get
             {
-                player.SetCurrentHealth(savedHealth);
+                SaveData data = new();
+                JsonUtility.FromJsonOverwrite(SaveDataString, data);
+                // May want to use a slot that is either in use or not in use, depending on how we want to implement it.
+                // Just going to make a temporary save for now.
+                data.name = "tempSave";
+                return data;
             }
+            set
+            {
+                SaveDataString = JsonUtility.ToJson(value);
+            }
+        }
+
+        public SaveStateData() { }
+
+        /// <summary>
+        /// Creates a new SaveStateData from an already existing file.
+        /// </summary>
+        /// <param name="path">The path of the .json file to read from.</param>
+        public SaveStateData(string path)
+        {
+            if (!File.Exists(path)) return;
+
+            JsonUtility.FromJsonOverwrite(File.ReadAllText(path), this);
+        }
+
+        public void WriteToFile(string path)
+        {
+            File.WriteAllText(path, JsonUtility.ToJson(this, true));
         }
     }
 }
