@@ -17,7 +17,7 @@ namespace TackleboxDbg
             MainMenu._currentState == MainMenu._gameplayState;
 
         public int CurrentIndex;
-        private string[] SaveStateFiles =>
+        private string[] SaveStateFiles => 
             [.. Directory.GetFiles(saveStatesPath).Where(x => x.EndsWith(".json"))];
         public string[] SaveStateNames => 
             [.. SaveStateFiles.Select(Path.GetFileNameWithoutExtension)];
@@ -28,9 +28,17 @@ namespace TackleboxDbg
             lookDir = PlayerCamera._lookDirection,
             facingDir = Player._currentFacingDirection,
             health = Player._currentHealth,
+            safeMortarIsland = GetMortarIslandMook()._currentState == MortarDesertMook._states.Dead,
 
             SaveData = SaveManager._currentSaveData
         };
+
+        private MortarDesertMook GetMortarIslandMook()
+        {
+            return GameObject.FindObjectsByType<MortarDesertMook>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                .Where(x => !x._canRespawn)
+                .First();
+        }
 
         public SaveStateManager()
         {
@@ -47,7 +55,7 @@ namespace TackleboxDbg
             while(File.Exists($"{saveStatesPath}/{name}.json"))
             {
                 i++;
-                name = "SaveState" + i.ToString();
+                name = "SaveState " + i.ToString();
             }
 
             CurrentData.WriteToFile($"{saveStatesPath}/{name}.json");
@@ -79,6 +87,12 @@ namespace TackleboxDbg
             Process.Start(saveStatesPath);
         }
 
+        public void LoadCurrentNonSaveData()
+        {
+            SaveStateData data = new(SaveStateFiles[CurrentIndex]);
+            Manager._instance.StartCoroutine(LoadStateDataRoutine(data));
+        }
+
         private void SetCurrentIndexByName(string name)
         {
             int i = Array.IndexOf(SaveStateNames, name);
@@ -96,17 +110,22 @@ namespace TackleboxDbg
             yield return new WaitUntil(() => IsInGame);
             
             // The game doesn't load the checkpoint rods properly, so I'm doing it manually here.
-            var zipList = GameObject.FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            foreach (var zip in zipList)
+            ZipRing[] zipList = GameObject.FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            Dictionary<Guid, object> varRefs = data.SaveData._variableReferences;
+            foreach (ZipRing zip in zipList)
             {
                 BoolVariableReference actRef = zip._activatedReference;
-                Dictionary<Guid, object> varRefs = data.SaveData._variableReferences;
                 if (actRef is null || !varRefs.ContainsKey(actRef._guid)) continue;
 
                 if ((bool)varRefs[actRef._guid]) zip.Activate(true);
                 else zip.Deactivate(true);
             }
-            
+
+            yield return LoadStateDataRoutine(data, true);
+        }
+
+        private IEnumerator LoadStateDataRoutine(SaveStateData data, bool waitToSetHealth = false)
+        {
             if(data.playerPos != Vector3.zero) 
                 Player.Teleport(data.playerPos);
             if(data.lookDir != Vector3.zero)
@@ -117,8 +136,12 @@ namespace TackleboxDbg
                 Player._currentFacingDirection = data.facingDir;
             }
 
-            yield return new WaitUntil(() => Player._currentHealth == 3);
+            if(waitToSetHealth) yield return new WaitUntil(() => Player._currentHealth == 3);
             if (0 < data.health && data.health < 3) Player.SetCurrentHealth(data.health);
+
+            MortarDesertMook mook = GetMortarIslandMook();
+            if(data.safeMortarIsland) mook.Kill(Vector3.zero);
+            else mook._headAgent.Respawn();
         }
     }
 
@@ -129,6 +152,7 @@ namespace TackleboxDbg
         public Vector3 lookDir;
         public Vector3 facingDir;
         public int health;
+        public bool safeMortarIsland;
 
         [SerializeField]
         private string SaveDataString;

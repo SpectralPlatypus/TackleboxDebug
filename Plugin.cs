@@ -111,9 +111,17 @@ namespace TackleboxDbg
             {
                 if (ImGui.CollapsingHeader("SaveStates"))
                 {
-                    if (SSManager.IsInGame && ImGui.Button("Load"))
+                    if (SSManager.IsInGame)
                     {
-                        SSManager.LoadCurrent();
+                        if(ImGui.Button("Load"))
+                        {
+                            SSManager.LoadCurrent();
+                        }
+                        ImGui.SameLine();
+                        if(ImGui.Button("Teleport"))
+                        {
+                            SSManager.LoadCurrentNonSaveData();
+                        }
                     }
                     
                     ImGui.ListBox("", ref SSManager.CurrentIndex, SSManager.SaveStateNames, SSManager.SaveStateNames.Length, 10);
