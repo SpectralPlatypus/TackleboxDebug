@@ -32,11 +32,8 @@
     <Reference Include="Assembly-CSharp-firstpass">
       <HintPath>libs\Assembly-CSharp-firstpass.dll</HintPath>
     </Reference>
-    <Reference Include="RG.ImGui">
-      <HintPath>libs\RG.ImGui.dll</HintPath>
-    </Reference>
-    <Reference Include="RG.ImGui.Unity">
-      <HintPath>libs\RG.ImGui.Unity.dll</HintPath>
+    <Reference Include="ImGui.NET">
+      <HintPath>libs\ImGui.NET.dll</HintPath>
     </Reference>
     <Reference Include="Sirenix.Serialization">
       <HintPath>libs\Sirenix.Serialization.dll</HintPath>

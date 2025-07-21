@@ -1,11 +1,17 @@
 ﻿using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
+using MonoMod.Utils;
 using System.Reflection;
 using UnityEngine;
 
 namespace TackleboxDbg
 {
+    public enum GameVersions
+    {
+        V1_1_0,
+        V1_2_4
+    }
     static class ModInfo
     {
         public const string PLUGIN_GUID = "TackleboxDbg";
@@ -22,16 +28,17 @@ namespace TackleboxDbg
         ConfigEntry<KeyboardShortcut> ToggleDebugKey;
         ConfigEntry<KeyboardShortcut> RespawnCollectiblesKey;
         ConfigEntry<KeyboardShortcut> ClearShreddersKey;
-        ConfigEntry<KeyboardShortcut> SaveStateKey;
-        ConfigEntry<KeyboardShortcut> LoadStateKey;
         ConfigEntry<KeyboardShortcut> GiveWhistleKey;
         public static ConfigEntry<bool> OverrideDebugArrow;
         #endregion
-
+        static GameVersions currentVersion = GameVersion();
+        static Type fishType = AccessTools.TypeByName(
+            (currentVersion == GameVersions.V1_1_0) ? "IntroWalkingFish" : "CapturableWalkingFish");
         private void Awake()
-        {
+        {           
             // Plugin startup logic
             Logger.LogInfo($"Plugin {ModInfo.PLUGIN_NAME} is loaded!");
+            Logger.LogInfo($"Game Version: {GetVersion()}");
 
             var harmony = new Harmony(ModInfo.PLUGIN_GUID);
             try
@@ -47,9 +54,24 @@ namespace TackleboxDbg
             RespawnCollectiblesKey = Config.Bind("Inputs", "RespawnCollectibles", new KeyboardShortcut(KeyCode.F10), "Respawn Coins/Fish");
             ClearShreddersKey = Config.Bind("Inputs", "ClearShredders", new KeyboardShortcut(KeyCode.F9), "Despawn untethered shredders");
             GiveWhistleKey = Config.Bind("Inputs", "GiveWhistleKey", new KeyboardShortcut(KeyCode.F8), "Give the player the whistle");
-            LoadStateKey = Config.Bind("Inputs", "LoadStateKey", new KeyboardShortcut(KeyCode.F4), "Load the saved game data");
-            SaveStateKey = Config.Bind("Inputs", "SaveStateKey", new KeyboardShortcut(KeyCode.F3), "Save the current game data");
             OverrideDebugArrow = Config.Bind("Misc", "OverrideDbgArrow", true, "Changes Debug Arrow behavior to display the respawn area");
+        }
+
+        public static Version GetVersion()
+        {
+            return BuildDate.Version();
+        }
+        public static GameVersions CurrentVersion() => currentVersion;
+
+        private static GameVersions GameVersion()
+        {
+            var v = GetVersion();
+            if (v.Equals(new Version(1, 0, 9149, 40858)))
+            {
+                return GameVersions.V1_2_4;
+            }
+
+            return GameVersions.V1_1_0;
         }
 
         private void Update()
@@ -73,31 +95,31 @@ namespace TackleboxDbg
                 {
                     GiveWhistle();
                 }
-                if(SaveStateKey.Value.IsDown())
-                {
-                    SaveState.SaveCurrentData();
-                }
-                if(LoadStateKey.Value.IsDown())
-                {
-                    SaveState.LoadSavedData();
-                }
             }
         }
 
-        static void ResetCollectibles()
+        FieldInfo fishCaptField = AccessTools.Field(fishType, "_capturable");
+        FieldInfo fishAgentField = AccessTools.Field(fishType, "_agent");
+        MethodInfo fishPlayerRespawnedMethod = AccessTools.Method(fishType, "PlayerRespawned");
+        MethodInfo fishGameObjectProp = AccessTools.PropertyGetter(fishType, "_gameObject");
+
+         void ResetCollectibles()
         {
-            var captList = FindObjectsByType<IntroWalkingFish>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            var captList = FindObjectsByType(fishType, FindObjectsInactive.Include, FindObjectsSortMode.None);
             var currentCapt = Manager.GetPlayerMachine()._currentCapturingCapturable;
             foreach (var fish in captList)
             {
-                if (fish._capturable == currentCapt)
+                Capturable capt = (Capturable)fishCaptField.GetValue(fish);
+                if (capt == currentCapt)
                     continue;
-                if (fish._capturable._state == Capturable.State.Captured)
+                if (capt._state == Capturable.State.Captured)
                 {
-                    fish._agent.Enable();
-                    fish._capturable._state = Capturable.State.NotCapturing;
-                    fish.PlayerRespawned(null);
-                    fish._gameObject.SetActive(true);
+                    var agent = (FiletNavAgent)fishAgentField.GetValue(fish);
+                    agent.Enable();
+                    capt._state = Capturable.State.NotCapturing;
+
+                    fishPlayerRespawnedMethod.Invoke(fish, [null]);
+                    ((GameObject)fishGameObjectProp.Invoke(fish, null)).SetActive(true);
                 }
             }
             var coinList = FindObjectsByType<Coin>(FindObjectsInactive.Include, FindObjectsSortMode.None);
@@ -106,7 +128,7 @@ namespace TackleboxDbg
             {
 
                 if (!coin._collectible._collected ||
-                        coinMgr._coinPoolMedium._entries.Contains(coin) || coinMgr._coinPoolMedium._entries.Contains(coin) || coinMgr._coinPoolLarge._entries.Contains(coin))
+                        coinMgr._coinPoolSmall._entries.Contains(coin) || coinMgr._coinPoolMedium._entries.Contains(coin) || coinMgr._coinPoolLarge._entries.Contains(coin))
                     continue;
                 coin._collectible._collected = false;
                 coin._artObject.SetActive(true);

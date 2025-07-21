@@ -1,7 +1,11 @@
-﻿using HarmonyLib;
+﻿using BepInEx.Logging;
+using HarmonyLib;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using UnityEngine;
+using static UnityEngine.GridBrushBase;
+using Logger = BepInEx.Logging.Logger;
 
 namespace TackleboxDbg
 {
@@ -34,35 +38,6 @@ namespace TackleboxDbg
             codes.Insert(index++, new CodeInstruction(OpCodes.Ldarg_0));
             codes.Insert(index++, new CodeInstruction(OpCodes.Ldfld, startPos));
             codes.Insert(index++, new CodeInstruction(OpCodes.Callvirt, setPosType));
-
-            return codes.AsEnumerable();
-        }
-
-        [HarmonyTranspiler]
-        [HarmonyPatch(typeof(DearImGuiDemo), "<OnLayout>g__SaveButton|57_30")]
-        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, ILGenerator il)
-        {
-            var codes = new List<CodeInstruction>(instructions);
-            int brOpCode = -1;
-            int endFinallyOpCode = -1;
-            Label return0255Label = il.DefineLabel();
-            for (var i = 0; i < codes.Count; i++)
-            {
-                if (codes[i].opcode == OpCodes.Ldc_I4_0)
-                {
-                    brOpCode = i;
-                }
-                else if (codes[i].opcode == OpCodes.Endfinally)
-                {
-                    endFinallyOpCode = i;
-                    codes[endFinallyOpCode + 1].labels.Add(return0255Label);
-                    break;
-                }
-            }
-            if (brOpCode > -1 && endFinallyOpCode > -1)
-            {
-                codes[brOpCode] = new CodeInstruction(OpCodes.Br, return0255Label);
-            }
 
             return codes.AsEnumerable();
         }
@@ -118,6 +93,84 @@ namespace TackleboxDbg
                     currentGround.SetActive(value: false);
                 }
             }
+        }
+    }
+
+    [HarmonyPatch]
+    internal class Patch_1240
+    {
+        static HashSet<Coin> assignedCoins = new();
+
+        static readonly Version expVersion = new Version(1, 0, 9149, 40858);
+
+        static ManualLogSource logSource = Logger.CreateLogSource(nameof(Patch_1240));
+        [HarmonyPrepare]
+        static bool PatchVersion()
+        {
+            var version = Plugin.GetVersion();
+            if (version != expVersion)
+            {
+                logSource.LogWarning("Skipping patches for this version!");
+                return false;
+            }
+
+            return true;
+        }
+
+        // Enemy coin respawn fix
+        [HarmonyPatch(typeof(FiletNavAgent), nameof(FiletNavAgent.Respawn))]
+        [HarmonyPostfix]
+        public static void Respawn(FiletNavAgent __instance)
+        {
+            foreach (Collectible collectible in __instance._collectibles)
+            {
+                if (collectible && !collectible._collected && collectible._emittedCoin)
+                {
+                    assignedCoins.Remove(collectible._emittedCoin);
+                    collectible._emittedCoin = null;
+                }
+            }
+        }
+
+        static bool Test(Coin coin)
+        {
+            logSource.LogWarning($"Called with active: {coin._isActiveAndEnabled}, in list: {assignedCoins.Contains(coin)}");
+            return coin._isActiveAndEnabled || assignedCoins.Contains(coin);
+        }
+
+        static MethodInfo myTestMethod = SymbolExtensions.GetMethodInfo(() => Test(null));
+        [HarmonyPatch(typeof(ObjectPool<Coin>), nameof(ObjectPool<Coin>.TryGetEntry))]
+        [HarmonyTranspiler]
+        static IEnumerable<CodeInstruction> TranspileTryGetEntry(IEnumerable<CodeInstruction> instructions)
+        {
+            return new CodeMatcher(instructions)
+                .MatchForward(false,
+                    new CodeMatch(OpCodes.Box),
+                    new CodeMatch(OpCodes.Callvirt, AccessTools.Method(typeof(ManagedBehaviour), "get__isActiveAndEnabled")))
+                    .Repeat(matcher =>
+                        matcher.SetInstructionAndAdvance(
+                            new CodeInstruction(OpCodes.Call, myTestMethod))
+                        .RemoveInstruction())
+                    .InstructionEnumeration();
+        }
+
+        [HarmonyPatch(typeof(CoinManager), "Emit", 
+            [typeof(Vector3), typeof(Vector3), typeof(Vector3), typeof(CollectibleAsset), typeof(float), typeof(float), typeof(float),typeof(bool)])]
+        [HarmonyPostfix]
+        public static void Emit(ref Coin __result)
+        {
+            if(__result)
+            {
+                assignedCoins.Add(__result);
+                logSource.LogWarning("Added coin to list: " + __result._name);
+            }
+        }
+
+        [HarmonyPatch(typeof(CoinManager), "OnSceneLoaded")]
+        [HarmonyPostfix]
+        public static void OnSceneLoaded()
+        {
+            assignedCoins.Clear();
         }
     }
 }
