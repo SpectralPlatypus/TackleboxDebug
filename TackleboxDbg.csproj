@@ -27,7 +27,7 @@
 	</PropertyGroup>
 
   <PropertyGroup>
-    <DefineConstants>$(DefineConstants);V1_2_4</DefineConstants>
+    <DefineConstants>$(DefineConstants);V1_1_0</DefineConstants>
     <!--<DefineConstants>V1_2_4</DefineConstants>-->
   </PropertyGroup>
 
