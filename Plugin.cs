@@ -11,7 +11,7 @@ namespace TackleboxDbg
     {
         public const string PLUGIN_GUID = "TackleboxDbg";
         public const string PLUGIN_NAME = "TackleboxDbg";
-        public const string PLUGIN_VERSION = "1.3.0";
+        public const string PLUGIN_VERSION = "1.4.0";
     }
 
     [BepInPlugin(ModInfo.PLUGIN_GUID, ModInfo.PLUGIN_NAME, ModInfo.PLUGIN_VERSION)]
@@ -68,12 +68,12 @@ namespace TackleboxDbg
 
         private void OnEnable()
         {
-            Patches.Layout += OnLayout;
+            PatchesCommon.Layout += OnLayout;
         }
 
         private void OnDisable()
         {
-            Patches.Layout -= OnLayout;
+            PatchesCommon.Layout -= OnLayout;
         }
 
         private void Update()
@@ -94,23 +94,23 @@ namespace TackleboxDbg
                 {
                     BurrowShredders();
                 }
-                if(GiveWhistleKey.Value.IsDown())
+                if (GiveWhistleKey.Value.IsDown())
                 {
                     GiveWhistle();
                 }
-                if(ResetCheckpointsKey.Value.IsDown())
+                if (ResetCheckpointsKey.Value.IsDown())
                 {
                     ResetCheckpoints();
                 }
-                if(SaveStateKey.Value.IsDown())
+                if (SaveStateKey.Value.IsDown())
                 {
                     SSManager.SaveCurrentDataToQuickSlot();
                 }
-                if(LoadStateKey.Value.IsDown())
+                if (LoadStateKey.Value.IsDown())
                 {
                     SSManager.LoadCurrent();
                 }
-                if(TeleportStateKey.Value.IsDown())
+                if (TeleportStateKey.Value.IsDown())
                 {
                     SSManager.LoadCurrentNonSaveData();
                 }
@@ -125,17 +125,17 @@ namespace TackleboxDbg
                 {
                     if (SSManager.IsInGame)
                     {
-                        if(ImGui.Button("Load"))
+                        if (ImGui.Button("Load"))
                         {
                             SSManager.LoadCurrent();
                         }
                         ImGui.SameLine();
-                        if(ImGui.Button("Teleport"))
+                        if (ImGui.Button("Teleport"))
                         {
                             SSManager.LoadCurrentNonSaveData();
                         }
                     }
-                    
+
                     ImGui.ListBox("", ref SSManager.CurrentIndex, SSManager.SaveStateNames, SSManager.SaveStateNames.Length, 10);
 
                     if (ImGui.Button("Delete"))
@@ -145,7 +145,7 @@ namespace TackleboxDbg
                     if (SSManager.IsInGame)
                     {
                         ImGui.SameLine();
-                        if(ImGui.Button("Create"))
+                        if (ImGui.Button("Create"))
                         {
                             SSManager.SaveCurrentDataToNewFile();
                         }
@@ -162,15 +162,21 @@ namespace TackleboxDbg
         void ResetCollectibles()
         {
             var currentCapt = Manager.GetPlayerMachine()._currentCapturingCapturable;
+#if V1_2_4
+            var captList = FindObjectsByType<CapturableWalkingFish>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+#elif V1_1_0
             var captList = FindObjectsByType<IntroWalkingFish>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+#endif
             foreach (var fish in captList)
             {
-                if (fish._capturable == currentCapt)
+                Capturable capturable = fish._capturable;
+                if (capturable == currentCapt)
                     continue;
-                if (fish._capturable._state == Capturable.State.Captured)
+                if (capturable._state == Capturable.State.Captured)
                 {
                     fish._agent.Enable();
-                    fish._capturable._state = Capturable.State.NotCapturing;
+                    capturable._state = Capturable.State.NotCapturing;
+
                     fish.PlayerRespawned(null);
                     fish._gameObject.SetActive(true);
                 }
@@ -192,13 +198,13 @@ namespace TackleboxDbg
             coinMgr._coinPoolMedium.DisableAll();
             coinMgr._coinPoolLarge.DisableAll();
         }
-        
+
         void ResetCheckpoints()
         {
             var zipList = FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            foreach(var zip in zipList)
+            foreach (var zip in zipList)
             {
-                if(zip._activatedReference is not null && zip._activatedReference.GetValue())
+                if (zip._activatedReference is not null && zip._activatedReference.GetValue())
                     // The zips don't instant-deactivate properly if they're active.
                     zip.Deactivate(IsInstant: !zip._gameObject.activeInHierarchy);
             }
@@ -208,7 +214,7 @@ namespace TackleboxDbg
         {
             var shredMgr = FindFirstObjectByType<ShredderManager>();
             var activeShredderList = activeShredders.GetValue(shredMgr) as List<SandShredder>;
-            foreach(var shredder in activeShredderList)
+            foreach (var shredder in activeShredderList)
             {
                 shredder.Burrow();
             }
@@ -236,6 +242,9 @@ namespace TackleboxDbg
             {
                 ResetAgentCollectibles(mook._headAgent, saveData);
             }
+#if V1_2_4
+            Patch_124.ClearCoins();
+#endif
         }
 
         void ResetAgentCollectibles(FiletNavAgent agent, SaveData saveData)
