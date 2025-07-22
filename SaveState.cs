@@ -12,14 +12,14 @@ namespace TackleboxDbg
         private SaveManager SaveManager => Manager.GetSaveManager();
         private PlayerCamera PlayerCamera => Manager.GetPlayerCamera();
 
-        public bool IsInGame => 
-            MainMenu._currentState == MainMenu._inGameState || 
+        public bool IsInGame =>
+            MainMenu._currentState == MainMenu._inGameState ||
             MainMenu._currentState == MainMenu._gameplayState;
 
         public int CurrentIndex;
-        private string[] SaveStateFiles => 
+        private string[] SaveStateFiles =>
             [.. Directory.GetFiles(saveStatesPath).Where(x => x.EndsWith(".json"))];
-        public string[] SaveStateNames => 
+        public string[] SaveStateNames =>
             [.. SaveStateFiles.Select(Path.GetFileNameWithoutExtension)];
 
         private SaveStateData CurrentData => new()
@@ -48,11 +48,11 @@ namespace TackleboxDbg
         public void SaveCurrentDataToNewFile()
         {
             if (!IsInGame) return;
-            
+
             int i = 1;
             string name = "SaveState";
 
-            while(File.Exists($"{saveStatesPath}/{name}.json"))
+            while (File.Exists($"{saveStatesPath}/{name}.json"))
             {
                 i++;
                 name = "SaveState " + i.ToString();
@@ -79,7 +79,7 @@ namespace TackleboxDbg
         public void DeleteCurrent()
         {
             File.Delete(SaveStateFiles[CurrentIndex]);
-            if(CurrentIndex == SaveStateFiles.Length) CurrentIndex--;
+            if (CurrentIndex == SaveStateFiles.Length) CurrentIndex--;
         }
 
         public void OpenSaveStateFolder()
@@ -96,7 +96,7 @@ namespace TackleboxDbg
         private void SetCurrentIndexByName(string name)
         {
             int i = Array.IndexOf(SaveStateNames, name);
-            if(i != -1) CurrentIndex = i;
+            if (i != -1) CurrentIndex = i;
         }
 
         private IEnumerator LoadSaveStateRoutine(string path)
@@ -106,9 +106,13 @@ namespace TackleboxDbg
             SaveStateData data = new(path);
 
             SaveManager.PrepareGameState(data.SaveData);
+#if V1_2_4
+            MainMenu.LoadGameScene(MainMenu._gameScene);
+#elif V1_1_0
             MainMenu.LoadGameScene();
+#endif
             yield return new WaitUntil(() => IsInGame);
-            
+
             // The game doesn't load the checkpoint rods properly, so I'm doing it manually here.
             ZipRing[] zipList = GameObject.FindObjectsByType<ZipRing>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             Dictionary<Guid, object> varRefs = data.SaveData._variableReferences;
@@ -126,21 +130,21 @@ namespace TackleboxDbg
 
         private IEnumerator LoadStateDataRoutine(SaveStateData data, bool waitToSetHealth = false)
         {
-            if(data.playerPos != Vector3.zero) 
+            if (data.playerPos != Vector3.zero)
                 Player.Teleport(data.playerPos);
-            if(data.lookDir != Vector3.zero)
+            if (data.lookDir != Vector3.zero)
                 PlayerCamera.SetLookDirection(data.lookDir);
-            if(data.facingDir != Vector3.zero)
+            if (data.facingDir != Vector3.zero)
             {
                 Player._targetFacingDirection = data.facingDir;
                 Player._currentFacingDirection = data.facingDir;
             }
 
-            if(waitToSetHealth) yield return new WaitUntil(() => Player._currentHealth == 3);
+            if (waitToSetHealth) yield return new WaitUntil(() => Player._currentHealth == 3);
             if (0 < data.health && data.health < 3) Player.SetCurrentHealth(data.health);
 
             MortarDesertMook mook = GetMortarIslandMook();
-            if(data.safeMortarIsland) mook.Kill(Vector3.zero);
+            if (data.safeMortarIsland) mook.Kill(Vector3.zero);
             else mook._headAgent.Respawn();
         }
     }

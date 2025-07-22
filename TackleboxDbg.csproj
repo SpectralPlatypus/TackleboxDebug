@@ -1,13 +1,14 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyName>TackleboxDbg</AssemblyName>
-    <Description>My first plugin</Description>
-    <Version>1.0.0</Version>
+    <Description>Speedrunning utilities and stability patches for The Big Catch: Tacklebox</Description>
+    <Version>1.4.0</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
+    <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
 
   <ItemGroup>
@@ -25,12 +26,28 @@
 	<DebugType>Full</DebugType>
 	</PropertyGroup>
 
+  <PropertyGroup>
+    <DefineConstants>$(DefineConstants);V1_1_0</DefineConstants>
+    <!--<DefineConstants>V1_2_4</DefineConstants>-->
+  </PropertyGroup>
+
   <ItemGroup>
-    <Reference Include="Assembly-CSharp">
-      <HintPath>libs\Assembly-CSharp.dll</HintPath>
-    </Reference>
     <Reference Include="Assembly-CSharp-firstpass">
       <HintPath>libs\Assembly-CSharp-firstpass.dll</HintPath>
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
+    <Reference Include="Eflatun.SceneReference">
+      <HintPath>libs\Eflatun.SceneReference.dll</HintPath>
+    </Reference>
+    <Reference Include="Sirenix.Serialization">
+      <HintPath>libs\Sirenix.Serialization.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup Condition="$(DefineConstants.Contains('V1_1_0'))">
+    <Reference Include="Assembly-CSharp, Version=1.0.8938.10506">
+      <HintPath>libs\Assembly-CSharp.dll</HintPath>
+      <SpecificVersion>True</SpecificVersion>
     </Reference>
     <Reference Include="RG.ImGui">
       <HintPath>libs\RG.ImGui.dll</HintPath>
@@ -38,8 +55,15 @@
     <Reference Include="RG.ImGui.Unity">
       <HintPath>libs\RG.ImGui.Unity.dll</HintPath>
     </Reference>
-    <Reference Include="Sirenix.Serialization">
-      <HintPath>libs\Sirenix.Serialization.dll</HintPath>
+  </ItemGroup>
+
+  <ItemGroup Condition="$(DefineConstants.Contains('V1_2_4'))">
+    <Reference Include="Assembly-CSharp, Version=1.0.9149.40858">
+      <HintPath>libs\Assembly-CSharp.dll</HintPath>
+      <SpecificVersion>True</SpecificVersion>
+    </Reference>
+    <Reference Include="ImGui.NET" Condition="$(DefineConstants.Contains('V1_2_4'))">
+      <HintPath>libs\ImGui.NET.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>
